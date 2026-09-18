@@ -6,7 +6,6 @@
 import NextAuth from 'next-auth';
 import Credentials from 'next-auth/providers/credentials';
 import { headers } from 'next/headers';
-import { decode } from 'next-auth/jwt';
 import bcrypt from 'bcryptjs';
 import { prisma } from '@/lib/db/client';
 import { LoginSchema } from '@/lib/validations';

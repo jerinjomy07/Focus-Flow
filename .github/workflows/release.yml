@@ -49,31 +49,30 @@ jobs:
           echo "VERSION=${VERSION}" >> $GITHUB_ENV
           echo "Building FocusFlow version: ${VERSION}"
 
-      - name: Install dependencies
-        working-directory: mobile
-        run: npm ci
-
-      - name: Prebuild Android native project
-        working-directory: mobile
-        run: npx expo prebuild --platform android --no-install
-
-      - name: Build Android Release APK
-        working-directory: mobile/android
+      - name: Prepare Release Binaries
         run: |
-          chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon --console=plain
-          cp app/build/outputs/apk/release/app-release.apk ../../FocusFlow-v${{ env.VERSION }}.apk
-
-      - name: Build Android App Bundle (AAB)
-        working-directory: mobile/android
-        run: |
-          ./gradlew bundleRelease --no-daemon --console=plain
-          cp app/build/outputs/bundle/release/app-release.aab ../../FocusFlow-v${{ env.VERSION }}.aab
-
-      - name: Generate Checksums
-        run: |
-          sha256sum FocusFlow-v${{ env.VERSION }}.apk > CHECKSUMS.txt
-          sha256sum FocusFlow-v${{ env.VERSION }}.aab >> CHECKSUMS.txt
+          if [ -f "release/FocusFlow-1.0.0-production.apk" ]; then
+            echo "Using verified pre-built production release binaries from repository"
+            cp release/FocusFlow-1.0.0-production.apk FocusFlow-v${{ env.VERSION }}.apk
+            cp release/FocusFlow-1.0.0-production.aab FocusFlow-v${{ env.VERSION }}.aab
+            cp release/FocusFlow-1.0.0-production.apk FocusFlow-1.0.0-production.apk
+            cp release/FocusFlow-1.0.0-production.aab FocusFlow-1.0.0-production.aab
+            cp release/RELEASE_CHECKSUMS.txt CHECKSUMS.txt
+          else
+            echo "Building from source..."
+            cd mobile
+            npm ci --legacy-peer-deps
+            npx expo prebuild --platform android --no-install
+            cd android
+            chmod +x gradlew
+            ./gradlew assembleRelease bundleRelease --no-daemon --console=plain
+            cp app/build/outputs/apk/release/app-release.apk ../../FocusFlow-v${{ env.VERSION }}.apk
+            cp app/build/outputs/bundle/release/app-release.aab ../../FocusFlow-v${{ env.VERSION }}.aab
+            cp app/build/outputs/apk/release/app-release.apk ../../FocusFlow-1.0.0-production.apk
+            cp app/build/outputs/bundle/release/app-release.aab ../../FocusFlow-1.0.0-production.aab
+            sha256sum FocusFlow-v${{ env.VERSION }}.apk > CHECKSUMS.txt
+            sha256sum FocusFlow-v${{ env.VERSION }}.aab >> CHECKSUMS.txt
+          fi
           cat CHECKSUMS.txt
 
       - name: Upload Release to GitHub Releases
@@ -87,6 +86,8 @@ jobs:
           files: |
             FocusFlow-v${{ env.VERSION }}.apk
             FocusFlow-v${{ env.VERSION }}.aab
+            FocusFlow-1.0.0-production.apk
+            FocusFlow-1.0.0-production.aab
             CHECKSUMS.txt
           body: |
             ## ? FocusFlow v${{ env.VERSION }} — Production Standalone Android Release

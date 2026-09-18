@@ -1,6 +1,8 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 // src/app/api/auth/mobile/__tests__/mobile-session-lifecycle.test.ts
 // FocusFlow — Mobile Session Family Lifecycle, Replay Revocation & Security Tests
 
+import crypto from 'crypto';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import {
   signMobileAccessToken,
@@ -83,7 +85,6 @@ describe('Mobile Session Family Security & Lifecycle', () => {
     });
 
     it('rejects expired access tokens', () => {
-      const crypto = require('crypto');
       const expiredPayload = {
         iss: 'focusflow-api',
         aud: 'focusflow-mobile',
