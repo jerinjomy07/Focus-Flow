@@ -134,10 +134,30 @@ export async function POST(req: Request) {
       }
     });
 
+    const updatedUser = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        timezone: true,
+        onboardedAt: true,
+      },
+    });
+
     return NextResponse.json({
       data: {
         success: true,
         message: 'Onboarding completed successfully',
+        user: updatedUser
+          ? {
+              id: updatedUser.id,
+              name: updatedUser.name,
+              email: updatedUser.email,
+              timezone: updatedUser.timezone,
+              onboardedAt: updatedUser.onboardedAt ? updatedUser.onboardedAt.toISOString() : null,
+            }
+          : null,
       },
     });
   } catch (error) {

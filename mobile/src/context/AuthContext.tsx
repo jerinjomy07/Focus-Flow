@@ -105,7 +105,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     firstProjectName?: string;
   }) => {
     const res = await authApi.completeOnboarding(data);
-    setUser(res.user);
+    if (res?.user) {
+      setUser(res.user);
+    } else {
+      setUser((prev) =>
+        prev
+          ? {
+              ...prev,
+              onboardedAt: new Date().toISOString(),
+              timezone: data.timezone,
+            }
+          : null
+      );
+    }
   };
 
   const logout = async () => {

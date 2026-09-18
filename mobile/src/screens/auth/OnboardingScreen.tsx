@@ -12,11 +12,13 @@ import {
   ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useRouter } from 'expo-router';
 import { useAuth } from '../../context/AuthContext';
 import { colors, spacing, borderRadius, typography, layout } from '../../theme';
 import { ApiClientError } from '../../api/client';
 
 export const OnboardingScreen: React.FC = () => {
+  const router = useRouter();
   const { completeOnboarding } = useAuth();
   const detectedTz = Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 
@@ -40,7 +42,7 @@ export const OnboardingScreen: React.FC = () => {
         dailyGoal,
         firstProjectName: firstProjectName.trim() || undefined,
       });
-      // AuthContext updates user.onboardedAt which triggers navigation to MainTabs
+      router.replace('/(tabs)');
     } catch (err: unknown) {
       if (err instanceof ApiClientError) {
         setErrorMessage(err.message);
