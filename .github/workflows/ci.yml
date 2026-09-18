@@ -14,6 +14,20 @@ jobs:
   validate:
     name: Quality Gates & Production Build
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: password
+          POSTGRES_DB: focusflow
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
     defaults:
       run:
         working-directory: focusflow-app
@@ -41,15 +55,27 @@ jobs:
       - name: ESLint Static Analysis
         run: npm run lint
 
+      - name: Push Database Schema
+        run: npx prisma db push --skip-generate
+        env:
+          DATABASE_URL: "postgresql://postgres:password@localhost:5432/focusflow?schema=public"
+          DIRECT_URL: "postgresql://postgres:password@localhost:5432/focusflow?schema=public"
+
       - name: Automated Test Suite (Unit & Component)
         run: npm test
+        env:
+          DATABASE_URL: "postgresql://postgres:password@localhost:5432/focusflow?schema=public"
+          DIRECT_URL: "postgresql://postgres:password@localhost:5432/focusflow?schema=public"
+          AUTH_SECRET: "ci_pipeline_dummy_auth_secret_minimum_32_characters_for_build"
+          MOBILE_AUTH_SECRET: "ci_pipeline_dummy_mobile_auth_secret_minimum_32_characters"
 
       - name: Production Build (Turbopack)
         run: npm run build
         env:
-          DATABASE_URL: "postgresql://postgres:postgres@localhost:5432/focusflow?schema=public"
-          DIRECT_URL: "postgresql://postgres:postgres@localhost:5432/focusflow?schema=public"
+          DATABASE_URL: "postgresql://postgres:password@localhost:5432/focusflow?schema=public"
+          DIRECT_URL: "postgresql://postgres:password@localhost:5432/focusflow?schema=public"
           AUTH_SECRET: "ci_pipeline_dummy_auth_secret_minimum_32_characters_for_build"
+          MOBILE_AUTH_SECRET: "ci_pipeline_dummy_mobile_auth_secret_minimum_32_characters"
           AUTH_URL: "http://localhost:3000"
           NEXT_PUBLIC_APP_URL: "http://localhost:3000"
           NEXT_PUBLIC_APP_VERSION: "1.0.0"
