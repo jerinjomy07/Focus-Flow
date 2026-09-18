@@ -100,7 +100,7 @@ describe('Mobile Session Family Security & Lifecycle', () => {
       const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
       const payload = Buffer.from(JSON.stringify(expiredPayload)).toString('base64url');
       const data = `${header}.${payload}`;
-      const sig = crypto.createHmac('sha256', process.env.MOBILE_AUTH_SECRET).update(data).digest('base64url');
+      const sig = crypto.createHmac('sha256', process.env.MOBILE_AUTH_SECRET || 'fallback_secret_for_test').update(data).digest('base64url');
 
       expect(verifyMobileAccessToken(`${data}.${sig}`)).toBeNull();
     });
