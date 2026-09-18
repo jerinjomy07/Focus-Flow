@@ -56,12 +56,13 @@ describe('Productivity Date-Range & Timezone Domain Logic', () => {
       const bounds = getLocalDayBoundsUtc('2026-09-17', tz);
       expect(bounds.startUtc.getTime()).toBeLessThan(bounds.endUtcExclusive.getTime());
 
-      // Start must format to 00:00:00 in tz
+      // Start must format to 00:00:00 in tz (handling both h23 and legacy representations)
       const startLocalTime = bounds.startUtc.toLocaleTimeString('en-US', {
         timeZone: tz,
         hour12: false,
+        hourCycle: 'h23',
       });
-      expect(startLocalTime).toBe('00:00:00');
+      expect(['00:00:00', '24:00:00']).toContain(startLocalTime);
 
       // 1 millisecond before start is previous day in tz
       const oneMsBeforeStart = new Date(bounds.startUtc.getTime() - 1);
