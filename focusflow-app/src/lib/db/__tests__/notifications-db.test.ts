@@ -101,13 +101,13 @@ describe('Notifications Database Layer (Real PostgreSQL Engine)', () => {
       } catch {
         // Database may already exist
       }
-    }
 
-    // Sync schema to PostgreSQL test database
-    execSync('npx prisma db push --skip-generate --accept-data-loss', {
-      env: { ...process.env, DATABASE_URL: testDbUrl, DIRECT_URL: testDbUrl },
-      stdio: 'ignore',
-    });
+      // Sync schema to PostgreSQL test database
+      execSync('npx prisma db push --skip-generate --accept-data-loss', {
+        env: { ...process.env, DATABASE_URL: testDbUrl, DIRECT_URL: testDbUrl },
+        stdio: 'ignore',
+      });
+    }
 
     await prisma.$connect();
   }, 60000);
