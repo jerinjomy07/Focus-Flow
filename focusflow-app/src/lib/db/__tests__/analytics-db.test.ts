@@ -73,33 +73,35 @@ describe('Analytics Database Aggregation Layer (Real PostgreSQL Engine)', () => 
     process.env.DATABASE_URL = testDbUrl;
     process.env.DIRECT_URL = testDbUrl;
 
-    const dataDir = path.resolve(process.cwd(), '.test-pg-data');
-    pgInstance = new EmbeddedPostgresClass({
-      port: 5433,
-      user: 'postgres',
-      password: 'password',
-      databaseDir: dataDir,
-      persistent: true,
-      createPostgresUser: false,
-      onLog: () => {},
-      onError: () => {},
-    });
+    if (!process.env.TEST_DATABASE_URL) {
+      const dataDir = path.resolve(process.cwd(), '.test-pg-data');
+      pgInstance = new EmbeddedPostgresClass({
+        port: 5433,
+        user: 'postgres',
+        password: 'password',
+        databaseDir: dataDir,
+        persistent: true,
+        createPostgresUser: false,
+        onLog: () => {},
+        onError: () => {},
+      });
 
-    try {
-      await pgInstance.start();
-    } catch {
       try {
-        await pgInstance.initialise();
         await pgInstance.start();
       } catch {
-        // May already be initialized and running
+        try {
+          await pgInstance.initialise();
+          await pgInstance.start();
+        } catch {
+          // May already be initialized and running
+        }
       }
-    }
 
-    try {
-      await pgInstance.createDatabase('focusflow_test');
-    } catch {
-      // Database may already exist
+      try {
+        await pgInstance.createDatabase('focusflow_test');
+      } catch {
+        // Database may already exist
+      }
     }
 
     // Sync schema to PostgreSQL test database

@@ -66,6 +66,7 @@ jobs:
         env:
           DATABASE_URL: "postgresql://postgres:password@localhost:5432/focusflow?schema=public"
           DIRECT_URL: "postgresql://postgres:password@localhost:5432/focusflow?schema=public"
+          TEST_DATABASE_URL: "postgresql://postgres:password@localhost:5432/focusflow?schema=public"
           AUTH_SECRET: "ci_pipeline_dummy_auth_secret_minimum_32_characters_for_build"
           MOBILE_AUTH_SECRET: "ci_pipeline_dummy_mobile_auth_secret_minimum_32_characters"
 
