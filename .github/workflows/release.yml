@@ -1,0 +1,107 @@
+name: Build & Release FocusFlow APK
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build and release (e.g. 1.0.0)'
+        required: false
+        default: '1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build FocusFlow Android Release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: '17'
+
+      - name: Set up Node.js 20
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: 'mobile/package-lock.json'
+
+      - name: Determine Version
+        id: get_version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          else
+            VERSION=$(node -p "require('./mobile/package.json').version")
+          fi
+          echo "VERSION=${VERSION}" >> $GITHUB_ENV
+          echo "Building FocusFlow version: ${VERSION}"
+
+      - name: Install dependencies
+        working-directory: mobile
+        run: npm ci
+
+      - name: Prebuild Android native project
+        working-directory: mobile
+        run: npx expo prebuild --platform android --no-install
+
+      - name: Build Android Release APK
+        working-directory: mobile/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon --console=plain
+          cp app/build/outputs/apk/release/app-release.apk ../../FocusFlow-v${{ env.VERSION }}.apk
+
+      - name: Build Android App Bundle (AAB)
+        working-directory: mobile/android
+        run: |
+          ./gradlew bundleRelease --no-daemon --console=plain
+          cp app/build/outputs/bundle/release/app-release.aab ../../FocusFlow-v${{ env.VERSION }}.aab
+
+      - name: Generate Checksums
+        run: |
+          sha256sum FocusFlow-v${{ env.VERSION }}.apk > CHECKSUMS.txt
+          sha256sum FocusFlow-v${{ env.VERSION }}.aab >> CHECKSUMS.txt
+          cat CHECKSUMS.txt
+
+      - name: Upload Release to GitHub Releases
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/v') || github.event_name == 'workflow_dispatch'
+        with:
+          name: "FocusFlow v${{ env.VERSION }}"
+          tag_name: "v${{ env.VERSION }}"
+          draft: false
+          prerelease: false
+          files: |
+            FocusFlow-v${{ env.VERSION }}.apk
+            FocusFlow-v${{ env.VERSION }}.aab
+            CHECKSUMS.txt
+          body: |
+            ## ? FocusFlow v${{ env.VERSION }} — Production Standalone Android Release
+
+            Download the standalone APK below to install and run FocusFlow directly on your Android phone (Android 7.0+ / SDK 24 to 36).
+
+            ### ?? Download Assets
+            - **[FocusFlow-v${{ env.VERSION }}.apk](https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/FocusFlow-v${{ env.VERSION }}.apk)** *(Direct Installable APK)*
+            - **[FocusFlow-v${{ env.VERSION }}.aab](https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/FocusFlow-v${{ env.VERSION }}.aab)** *(Google Play Bundle)*
+
+            ### ?? Highlights & Features:
+            - **Pure Standalone Android Client**: Genuine React Native + Expo binary running on Hermes V12 with ProGuard optimization.
+            - **Deterministic Timestamp Timer**: Zero-drift target-end-time wall-clock reconciliation across background and foreground states.
+            - **Hardware-Backed Keystore Security**: Dual-token authentication with rotating refresh tokens and replay detection via `expo-secure-store`.
+            - **Cloud & Cross-Platform Sync**: Seamless real-time synchronization with Neon PostgreSQL and Vercel serverless platform.
+            - **Full Productivity Suite**: Pomodoro timer, task backlog with priority tags, session audit history, and weekly productivity analytics.
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

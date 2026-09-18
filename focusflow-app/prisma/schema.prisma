@@ -1,0 +1,343 @@
+// This is your Prisma schema file for FocusFlow.
+// Learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ============================================================
+// ENUMS
+// ============================================================
+
+enum Theme {
+  LIGHT
+  DARK
+  SYSTEM
+}
+
+enum ProjectStatus {
+  ACTIVE
+  ARCHIVED
+}
+
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum Priority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum SessionType {
+  FOCUS
+  SHORT_BREAK
+  LONG_BREAK
+}
+
+enum SessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+  SKIPPED
+}
+
+enum GoalType {
+  POMODORO_COUNT
+  FOCUS_DURATION
+}
+
+enum GoalPeriod {
+  DAILY
+  WEEKLY
+}
+
+enum NotificationType {
+  FOCUS_SESSION_COMPLETED
+}
+
+// ============================================================
+// AUTH.JS v5 REQUIRED TABLES
+// ============================================================
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ============================================================
+// USER — Root identity entity
+// ============================================================
+
+model User {
+  id             String    @id @default(cuid())
+  name           String?
+  email          String    @unique
+  emailVerified  DateTime?
+  passwordHash   String?   @db.Text
+  image          String?
+  // IANA timezone string — e.g. "America/New_York", "Asia/Kolkata"
+  // All streak and analytics day-boundary calculations use this field.
+  timezone       String    @default("UTC")
+  onboardedAt    DateTime? // Timestamp when onboarding flow was completed
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  accounts       Account[]
+  sessions       Session[]
+  settings       UserSettings?
+  projects       Project[]
+  tasks          Task[]
+  focusSessions  FocusSession[]
+  goals          Goal[]
+  notifications  Notification[]
+  notificationPreference NotificationPreference?
+  mobileSessions MobileSession[]
+
+  @@index([email])
+}
+
+// ============================================================
+// MOBILE SESSION — Dedicated server-side mobile device sessions
+// ============================================================
+
+model MobileSession {
+  id               String    @id @default(cuid())
+  userId           String
+  sessionFamilyId  String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String    @unique
+  deviceName       String?
+  deviceType       String    @default("android")
+  lastUsedAt       DateTime  @default(now())
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([sessionFamilyId])
+  @@index([refreshTokenHash])
+}
+
+// ============================================================
+// USER SETTINGS — One-to-one with User
+// ============================================================
+
+model UserSettings {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  // Timer durations in minutes
+  focusDuration          Int      @default(25)   // 1–120
+  shortBreakDuration     Int      @default(5)    // 1–60
+  longBreakDuration      Int      @default(15)   // 1–120
+  sessionsBeforeLongBreak Int     @default(4)    // 1–10
+  // Behavior toggles
+  autoStartBreaks        Boolean  @default(false)
+  autoStartFocus         Boolean  @default(false)
+  // Notification toggles
+  soundEnabled           Boolean  @default(true)
+  notificationsEnabled   Boolean  @default(true)
+  // Appearance
+  theme                  Theme    @default(SYSTEM)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// PROJECT — Organizational grouping for tasks and time
+// ============================================================
+
+model Project {
+  id          String        @id @default(cuid())
+  userId      String
+  name        String        // max 100 chars (enforced in Zod)
+  description String?       @db.Text // max 500 chars (enforced in Zod)
+  color       String        @default("#6366f1") // hex color
+  status      ProjectStatus @default(ACTIVE)
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tasks         Task[]
+  focusSessions FocusSession[]
+
+  @@index([userId, status])
+}
+
+// ============================================================
+// TASK — Actionable work unit with Pomodoro tracking
+// ============================================================
+
+model Task {
+  id                  String     @id @default(cuid())
+  userId              String
+  projectId           String?    // null = "Inbox" — no project assignment
+  title               String     // max 200 chars (enforced in Zod)
+  description         String?    @db.Text // max 2000 chars (enforced in Zod)
+  status              TaskStatus @default(TODO)
+  priority            Priority   @default(MEDIUM)
+  estimatedPomodoros  Int?       // 1–50; null = no estimate
+  // Incremented server-side (atomically) upon each COMPLETED FOCUS session.
+  // This is the ONLY derived value persisted in the DB — all other analytics
+  // are computed live from FocusSession records.
+  completedPomodoros  Int        @default(0)
+  dueDate             DateTime?  // stored in UTC
+  createdAt           DateTime   @default(now())
+  updatedAt           DateTime   @updatedAt
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  project       Project?       @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  focusSessions FocusSession[]
+
+  @@index([userId])
+  @@index([userId, status])
+  @@index([userId, projectId])
+  @@index([userId, dueDate])
+}
+
+// ============================================================
+// FOCUS SESSION — Immutable analytics ledger
+// Created at session START (not completion) for data integrity.
+// Source of truth for ALL productivity analytics.
+// ============================================================
+
+model FocusSession {
+  id              String        @id @default(cuid())
+  userId          String
+  taskId          String?       // SET NULL on Task deletion (not CASCADE)
+  // Denormalized projectId: copied from task at session start.
+  // Enables single-table analytics queries without joining through Task.
+  projectId       String?       // SET NULL on Project deletion
+  type            SessionType
+  status          SessionStatus @default(IN_PROGRESS)
+  plannedDuration Int           // seconds (e.g. 1500 for 25 minutes)
+  actualDuration  Int?          // seconds; null while IN_PROGRESS
+  startedAt       DateTime      // UTC — used for streak and analytics
+  endedAt         DateTime?     // UTC; null while IN_PROGRESS
+  pausedAt        DateTime?     // UTC; null while running, populated when paused
+  pausedDuration  Int           @default(0) // accumulated pause seconds
+  createdAt       DateTime      @default(now())
+
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  task    Task?    @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  project Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+
+  // Composite indexes for analytical query patterns documented in
+  // /docs/database-architecture.md section 4
+  @@index([userId])
+  @@index([userId, startedAt])
+  @@index([userId, type, status])
+  @@index([userId, projectId, startedAt])
+  @@index([taskId])
+  // Phase 11 performance indexes:
+  // Optimizes findFirst({ where: { userId, status: 'IN_PROGRESS' } }) — active session check
+  @@index([userId, status, startedAt])
+  // Optimizes history queries filtered by userId AND taskId — replaces single-column taskId index
+  @@index([userId, taskId, startedAt])
+}
+
+// ============================================================
+// GOAL — Daily or weekly productivity targets
+// Progress is always derived from FocusSession records (never stored).
+// ============================================================
+
+model Goal {
+  id        String     @id @default(cuid())
+  userId    String
+  type      GoalType
+  target    Int        // count (POMODORO_COUNT) or minutes (FOCUS_DURATION)
+  period    GoalPeriod
+  startDate DateTime   // date goal tracking began
+  endDate   DateTime?  // null = indefinite / recurring
+  isActive  Boolean    @default(true)
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, isActive])
+  @@index([userId, period])
+}
+
+// ============================================================
+// NOTIFICATION PREFERENCE — User notification delivery toggles
+// ============================================================
+
+model NotificationPreference {
+  id                     String   @id @default(cuid())
+  userId                 String   @unique
+  focusSessionCompletion Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ============================================================
+// NOTIFICATION — In-app notification ledger
+// ============================================================
+
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      NotificationType
+  title     String           // max 200 chars
+  body      String           @db.Text
+  readAt    DateTime?        // null = unread
+  metadata  Json?            // structured payload e.g. { focusSessionId: "..." }
+  dedupeKey String?          @unique // deterministic key for idempotency e.g. focus-session-completed:<id>
+  createdAt DateTime         @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([userId, readAt])
+}
+
