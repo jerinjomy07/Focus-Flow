@@ -399,7 +399,7 @@ export const SettingsScreen: React.FC = () => {
                     BUILD VERSION
                   </Text>
                   <Text style={[typography.labelTelemetry, { color: colors.text, fontSize: 11 }]}>
-                    v1.0.0-stitch
+                    v2.0.0-stitch
                   </Text>
                 </View>
                 <View style={[styles.fieldRow, styles.fieldDivider, { borderTopColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)' }]}>

@@ -1,31 +1,38 @@
-# FocusFlow � Production Release Notes
-
-**Version**: 1.0.0 (Build 1)  
-**Target Platform**: Android 7.0+ (API Level 24 to 36)  
-**Architecture**: Pure Standalone React Native + Expo Native Binary (Hermes V12 Bytecode Engine)  
-**Backend Infrastructure**: Vercel Serverless Platform (Next.js 16.3.5)  
-**Database**: Managed Neon Serverless PostgreSQL  
-**Release Date**: September 18, 2026  
+# FocusFlow v2.0.0 Production Release Notes
+**Release Date**: September 19, 2026
+**Target Platforms**: Android 7.0+ (API 24 to 36), Web (Next.js 16)
+**Build Engine**: Hermes Bytecode AOT / React Native 0.86.3
 
 ---
 
-## 1. Release Artifacts
-- **Production APK**: FocusFlow-1.0.0-production.apk (68,356,427 bytes)
-  - SHA-256: EA624D2D85ACD348B5CDE53FE74C6DD21E17D74D87D14899B3898499842BFB9B
-- **Production AAB**: FocusFlow-1.0.0-production.aab (47,269,006 bytes)
-  - SHA-256: 3FAFB6988D0E4EB1385DE41985EE29939F0EB976724D74F7D5F981C9009BE42D
+## 🚀 Highlights & Major Features
+
+### 1. Brand Identity & Holographic App Icon
+- Master high-definition holographic icon with orbital particle and deep cosmic gradients.
+- Updated Android adaptive launcher mipmap icons (`mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}`) and splash screens.
+
+### 2. Google Stitch UI Overhaul (Obsidian Kinetic & Terra)
+- **Obsidian Kinetic Mode**: Cosmic dark palette (`#080E1A`), luminous cyan telemetry accents (`#4CD7F6`), elevated glassmorphic cards.
+- **Terra Mode**: Warm earthen workspace palette (`#F8F6F0` and `#2D5A43`).
+- **SVG Morphing Theme Switcher**: Animated transition between celestial Moon and radiant Sun icons.
+- **Header Quick-Toggle**: Instant theme switch button across main navigation views.
+
+### 3. Editable Task Projects & Custom Presets
+- Dynamic tag filtering and real-time project indicators.
+- Interactive `+` Custom Preset Modal allowing pilots to create custom project categories on the fly.
+
+### 4. Hardened 2-Stage Email OTP Password Reset
+- Cryptographic 6-digit verification code with 10-minute validity.
+- Direct integration with Resend transactional email API (`onboarding@resend.dev`).
+- Multi-stage credential recovery modal with automatic sign-in and session revocation.
+
+### 5. Architectural & Engine Optimizations
+- Universal release APK size: ~59.07 MB with ProGuard dead-code elimination.
+- Zero-drift monotonic wall-clock timer architecture.
+- Hardware-backed Android Keystore dual-token session security (`expo-secure-store`).
 
 ---
 
-## 2. Key Architecture & Features
-- **Pure Standalone Native Client**: Compiled directly to Android bytecode with zero WebView, iframe, or web wrapper.
-- **Dedicated Dual-Token Mobile Authentication**:
-  - Rotating refresh tokens backed by Android Keystore (expo-secure-store).
-  - Strict session-family replay detection and automatic token rotation.
-- **Deterministic Timestamp Timer**:
-  - Zero-drift target-end-time wall-clock reconciliation across background and foreground states.
-- **Cross-Platform Synchronization**:
-  - Real-time data persistence with Neon PostgreSQL for unified task, session, and analytics management across Web and Mobile.
-- **Security & Privacy**:
-  - Zero backend secrets bundled in the client application.
-  - End-to-end TLS/HTTPS communication with the production API.
+## 📦 Checksums & Verification
+- **Binary**: `FocusFlow-2.0.0-production.apk`
+- **SHA-256**: `3CB46E13972617F2D08873E24F87F40E921831050B65170E68D31773BF062ADE`
