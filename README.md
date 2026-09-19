@@ -55,7 +55,7 @@ FocusFlow operates a seamless cross-platform cloud experience deployed on **Verc
 
 * **Production URL**: [https://focusflow-app-red-gamma.vercel.app](https://focusflow-app-red-gamma.vercel.app)
 * **API Health Endpoint**: [https://focusflow-app-red-gamma.vercel.app/api/health](https://focusflow-app-red-gamma.vercel.app/api/health)
-* **Demo Account**: `jerinjomy07@gmail.com` / `alex@focusflow.app`
+* **Demo Account**: `alex@focusflow.app`
 
 ---
 
