@@ -1,5 +1,9 @@
 // mobile/src/screens/settings/SettingsScreen.tsx
-// FocusFlow Mobile — User Preferences & Account Settings Screen
+// FocusFlow Mobile — System Calibration & Settings Screen (Stitch Redesign)
+//
+// Source of Truth:
+// - Dark: mobile/design/stitch_focusflow_futuristic_redesign/settings_preferences_obsidian_kinetic/
+// - Light: mobile/design/stitch_focusflow_futuristic_redesign/settings_preferences_terra_design/
 
 import React from 'react';
 import {
@@ -15,13 +19,24 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
+import {
+  Palette,
+  User,
+  Clock,
+  Bell,
+  Cpu,
+  LogOut,
+  Sparkles,
+} from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { settingsApi } from '../../api/settings';
-import { colors, spacing, borderRadius, typography, layout } from '../../theme';
+import { GlassCard, KineticButton, MetricBadge, ScreenHeader } from '../../components';
 
 export const SettingsScreen: React.FC = () => {
   const router = useRouter();
   const { user, logout } = useAuth();
+  const { colors, typography, spacing, isDark, themeMode, setThemeMode } = useTheme();
   const queryClient = useQueryClient();
 
   const { data: settings, isLoading } = useQuery({
@@ -51,167 +66,370 @@ export const SettingsScreen: React.FC = () => {
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <ScrollView contentContainerStyle={styles.scrollContent}>
-        <View style={styles.header}>
-          <Text style={styles.title} accessibilityRole="header">Settings</Text>
-          <Text style={styles.subtitle}>Customize your Pomodoro experience.</Text>
-        </View>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.canvas }]} edges={['top']}>
+      {/* Unified HUD Screen Header */}
+      <ScreenHeader
+        title="Settings"
+        subtitle="System configuration & telemetry parameters"
+        statusText="SYS.CONFIG"
+      />
 
+      <ScrollView
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: spacing.bottomDockHeight + 40 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         {isLoading ? (
-          <View style={styles.loader}>
-            <ActivityIndicator color={colors.primaryLight} size="large" />
+          <View style={styles.loaderContainer}>
+            <ActivityIndicator color={colors.secondary} size="large" />
           </View>
         ) : (
           <>
+            {/* Visual System / Appearance Selector */}
+            <GlassCard level={2} style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <View style={styles.cardHeaderLeft}>
+                  <Palette size={16} color={colors.secondary} />
+                  <Text style={[typography.headlineSm, { color: colors.text, fontSize: 15 }]}>
+                    Visual Theme Engine
+                  </Text>
+                </View>
+                <MetricBadge type="status" label="DUAL THEME" color={colors.secondary} />
+              </View>
+              <Text style={[typography.bodySm, { color: colors.textSecondary, fontSize: 11, marginBottom: 12 }]}>
+                Switch between high-contrast kinetic substrates and natural grounded warmth.
+              </Text>
+
+              <View
+                style={[
+                  styles.themePillsRow,
+                  {
+                    backgroundColor: isDark
+                      ? 'rgba(8, 14, 26, 0.85)'
+                      : 'rgba(233, 228, 217, 0.85)',
+                    borderColor: isDark ? 'rgba(255, 255, 255, 0.06)' : colors.border,
+                  },
+                ]}
+              >
+                {[
+                  { key: 'obsidian', label: 'OBSIDIAN' },
+                  { key: 'terra', label: 'TERRA' },
+                  { key: 'system', label: 'SYSTEM' },
+                ].map((item) => {
+                  const isActive = themeMode === item.key;
+                  return (
+                    <TouchableOpacity
+                      key={item.key}
+                      style={[
+                        styles.themePill,
+                        isActive && [
+                          styles.themePillActive,
+                          {
+                            backgroundColor: colors.primary,
+                            shadowColor: colors.primary,
+                          },
+                        ],
+                      ]}
+                      onPress={() => setThemeMode(item.key as any)}
+                    >
+                      <Text
+                        style={[
+                          typography.labelCaps,
+                          {
+                            color: isActive ? colors.onPrimary : colors.textMuted,
+                            fontSize: 10,
+                          },
+                        ]}
+                      >
+                        {item.label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            </GlassCard>
+
             {/* Account Profile Card */}
-            <View style={styles.card}>
-              <Text style={styles.cardHeader}>Account Profile</Text>
-              <View style={styles.row}>
-                <Text style={styles.rowLabel}>Name</Text>
-                <Text style={styles.rowValue}>{user?.name || 'User'}</Text>
-              </View>
-              <View style={styles.row}>
-                <Text style={styles.rowLabel}>Email</Text>
-                <Text style={styles.rowValue}>{user?.email || '—'}</Text>
-              </View>
-              <View style={styles.row}>
-                <Text style={styles.rowLabel}>Timezone</Text>
-                <Text style={styles.rowValue}>{settings?.timezone || user?.timezone || 'UTC'}</Text>
-              </View>
-            </View>
-
-            {/* Timer Durations */}
-            <View style={styles.card}>
-              <Text style={styles.cardHeader}>Session Durations</Text>
-              <View style={styles.durationRow}>
-                <Text style={styles.rowLabel}>Focus Interval</Text>
-                <View style={styles.pillGroup}>
-                  {[25, 45, 50].map((mins) => (
-                    <TouchableOpacity
-                      key={mins}
-                      style={[
-                        styles.pill,
-                        settings?.focusDurationMinutes === mins && styles.pillActive,
-                      ]}
-                      onPress={() => updateMutation.mutate({ focusDuration: mins })}
-                    >
-                      <Text
-                        style={[
-                          styles.pillText,
-                          settings?.focusDurationMinutes === mins && styles.pillTextActive,
-                        ]}
-                      >
-                        {mins}m
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+            <GlassCard level={2} style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <View style={styles.cardHeaderLeft}>
+                  <User size={16} color={colors.primaryLight} />
+                  <Text style={[typography.headlineSm, { color: colors.text, fontSize: 15 }]}>
+                    Pilot Identity
+                  </Text>
                 </View>
               </View>
 
-              <View style={styles.durationRow}>
-                <Text style={styles.rowLabel}>Short Break</Text>
-                <View style={styles.pillGroup}>
-                  {[5, 10].map((mins) => (
-                    <TouchableOpacity
-                      key={mins}
-                      style={[
-                        styles.pill,
-                        settings?.shortBreakMinutes === mins && styles.pillActive,
-                      ]}
-                      onPress={() => updateMutation.mutate({ shortBreakDuration: mins })}
-                    >
-                      <Text
-                        style={[
-                          styles.pillText,
-                          settings?.shortBreakMinutes === mins && styles.pillTextActive,
-                        ]}
-                      >
-                        {mins}m
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+              <View style={styles.fieldList}>
+                <View style={styles.fieldRow}>
+                  <Text style={[typography.labelCaps, { color: colors.textSecondary, fontSize: 11 }]}>
+                    NAME
+                  </Text>
+                  <Text style={[typography.body, { color: colors.text, fontWeight: '600' }]}>
+                    {user?.name || 'Commander'}
+                  </Text>
+                </View>
+
+                <View style={[styles.fieldRow, styles.fieldDivider, { borderTopColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)' }]}>
+                  <Text style={[typography.labelCaps, { color: colors.textSecondary, fontSize: 11 }]}>
+                    EMAIL
+                  </Text>
+                  <Text style={[typography.labelTelemetry, { color: colors.textSecondary, fontSize: 12 }]}>
+                    {user?.email || '—'}
+                  </Text>
+                </View>
+
+                <View style={[styles.fieldRow, styles.fieldDivider, { borderTopColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)' }]}>
+                  <Text style={[typography.labelCaps, { color: colors.textSecondary, fontSize: 11 }]}>
+                    TIMEZONE
+                  </Text>
+                  <Text style={[typography.labelTelemetry, { color: colors.secondary, fontSize: 11 }]}>
+                    {settings?.timezone || user?.timezone || 'UTC'}
+                  </Text>
+                </View>
+              </View>
+            </GlassCard>
+
+            {/* Session Durations Calibration */}
+            <GlassCard level={2} style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <View style={styles.cardHeaderLeft}>
+                  <Clock size={16} color={colors.secondary} />
+                  <Text style={[typography.headlineSm, { color: colors.text, fontSize: 15 }]}>
+                    Session Durations
+                  </Text>
                 </View>
               </View>
 
-              <View style={styles.durationRow}>
-                <Text style={styles.rowLabel}>Long Break</Text>
+              {/* Focus Interval */}
+              <View style={styles.intervalBlock}>
+                <Text style={[typography.labelCaps, { color: colors.textSecondary, fontSize: 10, marginBottom: 6 }]}>
+                  FOCUS INTERVAL
+                </Text>
                 <View style={styles.pillGroup}>
-                  {[15, 20, 30].map((mins) => (
-                    <TouchableOpacity
-                      key={mins}
-                      style={[
-                        styles.pill,
-                        settings?.longBreakMinutes === mins && styles.pillActive,
-                      ]}
-                      onPress={() => updateMutation.mutate({ longBreakDuration: mins })}
-                    >
-                      <Text
+                  {[25, 45, 50].map((mins) => {
+                    const isActive = settings?.focusDurationMinutes === mins;
+                    return (
+                      <TouchableOpacity
+                        key={mins}
                         style={[
-                          styles.pillText,
-                          settings?.longBreakMinutes === mins && styles.pillTextActive,
+                          styles.intervalPill,
+                          {
+                            backgroundColor: isActive
+                              ? colors.primary
+                              : isDark
+                              ? 'rgba(13, 19, 31, 0.7)'
+                              : 'rgba(233, 228, 217, 0.6)',
+                            borderColor: isActive ? colors.primaryLight : colors.border,
+                          },
                         ]}
+                        onPress={() => updateMutation.mutate({ focusDuration: mins })}
                       >
-                        {mins}m
-                      </Text>
-                    </TouchableOpacity>
-                  ))}
+                        <Text
+                          style={[
+                            typography.labelTelemetry,
+                            {
+                              color: isActive ? colors.onPrimary : colors.textSecondary,
+                              fontSize: 11,
+                              fontWeight: '700',
+                            },
+                          ]}
+                        >
+                          {mins}m
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </View>
               </View>
-            </View>
 
-            {/* Sound & Notifications */}
-            <View style={styles.card}>
-              <Text style={styles.cardHeader}>Feedback & Alerts</Text>
+              {/* Short Break */}
+              <View style={styles.intervalBlock}>
+                <Text style={[typography.labelCaps, { color: colors.textSecondary, fontSize: 10, marginBottom: 6 }]}>
+                  SHORT BREAK
+                </Text>
+                <View style={styles.pillGroup}>
+                  {[5, 10].map((mins) => {
+                    const isActive = settings?.shortBreakMinutes === mins;
+                    return (
+                      <TouchableOpacity
+                        key={mins}
+                        style={[
+                          styles.intervalPill,
+                          {
+                            backgroundColor: isActive
+                              ? colors.primary
+                              : isDark
+                              ? 'rgba(13, 19, 31, 0.7)'
+                              : 'rgba(233, 228, 217, 0.6)',
+                            borderColor: isActive ? colors.primaryLight : colors.border,
+                          },
+                        ]}
+                        onPress={() => updateMutation.mutate({ shortBreakDuration: mins })}
+                      >
+                        <Text
+                          style={[
+                            typography.labelTelemetry,
+                            {
+                              color: isActive ? colors.onPrimary : colors.textSecondary,
+                              fontSize: 11,
+                              fontWeight: '700',
+                            },
+                          ]}
+                        >
+                          {mins}m
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+
+              {/* Long Break */}
+              <View style={styles.intervalBlock}>
+                <Text style={[typography.labelCaps, { color: colors.textSecondary, fontSize: 10, marginBottom: 6 }]}>
+                  LONG BREAK
+                </Text>
+                <View style={styles.pillGroup}>
+                  {[15, 20, 30].map((mins) => {
+                    const isActive = settings?.longBreakMinutes === mins;
+                    return (
+                      <TouchableOpacity
+                        key={mins}
+                        style={[
+                          styles.intervalPill,
+                          {
+                            backgroundColor: isActive
+                              ? colors.primary
+                              : isDark
+                              ? 'rgba(13, 19, 31, 0.7)'
+                              : 'rgba(233, 228, 217, 0.6)',
+                            borderColor: isActive ? colors.primaryLight : colors.border,
+                          },
+                        ]}
+                        onPress={() => updateMutation.mutate({ longBreakDuration: mins })}
+                      >
+                        <Text
+                          style={[
+                            typography.labelTelemetry,
+                            {
+                              color: isActive ? colors.onPrimary : colors.textSecondary,
+                              fontSize: 11,
+                              fontWeight: '700',
+                            },
+                          ]}
+                        >
+                          {mins}m
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              </View>
+            </GlassCard>
+
+            {/* Audio & Feedback Signals */}
+            <GlassCard level={2} style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <View style={styles.cardHeaderLeft}>
+                  <Bell size={16} color={colors.secondary} />
+                  <Text style={[typography.headlineSm, { color: colors.text, fontSize: 15 }]}>
+                    Feedback & Alerts
+                  </Text>
+                </View>
+              </View>
+
               <View style={styles.switchRow}>
-                <View style={styles.switchTextContainer}>
-                  <Text style={styles.rowLabel}>Completion Chime</Text>
-                  <Text style={styles.switchSubtext}>Play sound when timer finishes</Text>
+                <View style={styles.switchTextCol}>
+                  <Text style={[typography.body, { color: colors.text, fontWeight: '600' }]}>
+                    Completion Chime
+                  </Text>
+                  <Text style={[typography.bodySm, { color: colors.textSecondary, fontSize: 11 }]}>
+                    Harmonic frequency chime upon cycle completion
+                  </Text>
                 </View>
                 <Switch
                   value={settings?.soundEnabled ?? true}
                   onValueChange={(val) => updateMutation.mutate({ soundEnabled: val })}
-                  trackColor={{ false: colors.surfaceLight, true: colors.primary }}
-                  thumbColor={colors.text}
+                  trackColor={{
+                    false: isDark ? 'rgba(36, 42, 55, 0.6)' : 'rgba(219, 213, 201, 0.6)',
+                    true: colors.primary,
+                  }}
+                  thumbColor={colors.onPrimary}
                 />
               </View>
 
-              <View style={styles.switchRow}>
-                <View style={styles.switchTextContainer}>
-                  <Text style={styles.rowLabel}>Auto-Start Breaks</Text>
-                  <Text style={styles.switchSubtext}>Transition to break automatically</Text>
+              <View style={[styles.switchRow, styles.fieldDivider, { borderTopColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)' }]}>
+                <View style={styles.switchTextCol}>
+                  <Text style={[typography.body, { color: colors.text, fontWeight: '600' }]}>
+                    Auto-Start Breaks
+                  </Text>
+                  <Text style={[typography.bodySm, { color: colors.textSecondary, fontSize: 11 }]}>
+                    Transition to break interval automatically
+                  </Text>
                 </View>
                 <Switch
                   value={settings?.autoStartBreaks ?? false}
                   onValueChange={(val) => updateMutation.mutate({ autoStartBreaks: val })}
-                  trackColor={{ false: colors.surfaceLight, true: colors.primary }}
-                  thumbColor={colors.text}
+                  trackColor={{
+                    false: isDark ? 'rgba(36, 42, 55, 0.6)' : 'rgba(219, 213, 201, 0.6)',
+                    true: colors.primary,
+                  }}
+                  thumbColor={colors.onPrimary}
                 />
               </View>
-            </View>
+            </GlassCard>
 
-            {/* App Info & Sign Out */}
-            <View style={styles.card}>
-              <Text style={styles.cardHeader}>Application</Text>
-              <View style={styles.row}>
-                <Text style={styles.rowLabel}>Version</Text>
-                <Text style={styles.rowValue}>1.0.0 (Standalone Android)</Text>
+            {/* Application & Calibration Specifications */}
+            <GlassCard level={2} style={styles.card}>
+              <View style={styles.cardHeaderRow}>
+                <View style={styles.cardHeaderLeft}>
+                  <Cpu size={16} color={colors.secondary} />
+                  <Text style={[typography.headlineSm, { color: colors.text, fontSize: 15 }]}>
+                    Telemetry Diagnostics
+                  </Text>
+                </View>
               </View>
-              <View style={styles.row}>
-                <Text style={styles.rowLabel}>Package</Text>
-                <Text style={styles.rowValue}>com.focusflow.app</Text>
-              </View>
-            </View>
 
-            <TouchableOpacity
-              style={styles.signOutButton}
-              onPress={handleSignOut}
-              accessibilityRole="button"
-              accessibilityLabel="Sign out of FocusFlow"
-              activeOpacity={0.8}
-            >
-              <Text style={styles.signOutText}>Sign Out</Text>
-            </TouchableOpacity>
+              <View style={styles.fieldList}>
+                <View style={styles.fieldRow}>
+                  <Text style={[typography.labelCaps, { color: colors.textSecondary, fontSize: 11 }]}>
+                    BUILD VERSION
+                  </Text>
+                  <Text style={[typography.labelTelemetry, { color: colors.text, fontSize: 11 }]}>
+                    v1.0.0-stitch
+                  </Text>
+                </View>
+                <View style={[styles.fieldRow, styles.fieldDivider, { borderTopColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)' }]}>
+                  <Text style={[typography.labelCaps, { color: colors.textSecondary, fontSize: 11 }]}>
+                    RUNTIME
+                  </Text>
+                  <Text style={[typography.labelTelemetry, { color: colors.secondary, fontSize: 11 }]}>
+                    Hermes Bytecode AOT
+                  </Text>
+                </View>
+                <View style={[styles.fieldRow, styles.fieldDivider, { borderTopColor: isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(0, 0, 0, 0.05)' }]}>
+                  <Text style={[typography.labelCaps, { color: colors.textSecondary, fontSize: 11 }]}>
+                    PROTOCOL
+                  </Text>
+                  <Text style={[typography.labelTelemetry, { color: colors.primaryLight, fontSize: 11 }]}>
+                    Server-Authoritative
+                  </Text>
+                </View>
+              </View>
+            </GlassCard>
+
+            {/* Sign Out Button */}
+            <View style={styles.signOutWrapper}>
+              <KineticButton
+                title="TERMINATE SESSION (SIGN OUT)"
+                variant="danger"
+                onPress={handleSignOut}
+                icon={<LogOut size={16} color={colors.error} />}
+              />
+            </View>
           </>
         )}
       </ScrollView>
@@ -222,112 +440,90 @@ export const SettingsScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   scrollContent: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    gap: spacing.xl,
-  },
-  header: {
-    gap: spacing.xs,
-  },
-  title: {
-    ...typography.h2,
-    color: colors.text,
-  },
-  subtitle: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  loader: {
-    padding: spacing.xxxl,
-    alignItems: 'center',
+    paddingHorizontal: 16,
+    gap: 12,
   },
   card: {
-    backgroundColor: colors.surface,
+    padding: 14,
+  },
+  cardHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  cardHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  themePillsRow: {
+    flexDirection: 'row',
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    gap: spacing.md,
+    padding: 3,
   },
-  cardHeader: {
-    ...typography.caption,
-    color: colors.primaryLight,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: spacing.xs,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  themePill: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 9,
     alignItems: 'center',
-    paddingVertical: spacing.xs,
+    justifyContent: 'center',
   },
-  durationRow: {
+  themePillActive: {
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 0.35,
+    shadowRadius: 6,
+    elevation: 3,
+  },
+  fieldList: {
+    gap: 10,
+    marginTop: 4,
+  },
+  fieldRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    paddingVertical: spacing.xs,
+    justifyContent: 'space-between',
   },
-  rowLabel: {
-    ...typography.bodyMedium,
-    color: colors.text,
+  fieldDivider: {
+    paddingTop: 10,
+    borderTopWidth: 1,
   },
-  rowValue: {
-    ...typography.body,
-    color: colors.textSecondary,
+  intervalBlock: {
+    marginTop: 10,
   },
   pillGroup: {
     flexDirection: 'row',
-    gap: spacing.xs,
+    gap: 8,
   },
-  pill: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 6,
-    borderRadius: borderRadius.sm,
-    backgroundColor: colors.surfaceLight,
-  },
-  pillActive: {
-    backgroundColor: colors.primary,
-  },
-  pillText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  pillTextActive: {
-    color: colors.text,
-    fontWeight: '700',
+  intervalPill: {
+    flex: 1,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   switchRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.xs,
+    paddingVertical: 6,
   },
-  switchTextContainer: {
+  switchTextCol: {
     flex: 1,
-    marginRight: spacing.md,
+    marginRight: 12,
   },
-  switchSubtext: {
-    ...typography.tiny,
-    color: colors.textMuted,
-    marginTop: 2,
+  signOutWrapper: {
+    marginTop: 8,
+    marginBottom: 16,
   },
-  signOutButton: {
-    height: layout.minTouchTarget,
-    backgroundColor: colors.dangerMuted,
-    borderWidth: 1,
-    borderColor: colors.danger,
-    borderRadius: borderRadius.lg,
-    justifyContent: 'center',
+  loaderContainer: {
+    flex: 1,
     alignItems: 'center',
-    marginTop: spacing.md,
-    marginBottom: spacing.xl,
-  },
-  signOutText: {
-    ...typography.bodyBold,
-    color: colors.danger,
+    justifyContent: 'center',
+    padding: 40,
   },
 });

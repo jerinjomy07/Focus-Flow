@@ -70,3 +70,13 @@ Desktop.ini
 # TypeScript build info
 *.tsbuildinfo
 **/*.tsbuildinfo
+
+# Design Redesign Package (Strictly Excluded)
+design/
+**/design/
+mobile/design/
+
+# Local APK Binaries and Physical Screen Capture Artifacts
+*.apk
+**/*.apk
+physical_stitch_screen.png

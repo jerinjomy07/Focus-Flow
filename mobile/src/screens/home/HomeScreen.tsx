@@ -1,5 +1,9 @@
 // mobile/src/screens/home/HomeScreen.tsx
-// FocusFlow Mobile — Main Dashboard Screen
+// FocusFlow Mobile — Main Dashboard Screen (Stitch Redesign)
+//
+// Source of Truth:
+// - Dark: mobile/design/stitch_focusflow_futuristic_redesign/dashboard_command_center/
+// - Light: mobile/design/stitch_focusflow_futuristic_redesign/dashboard_terra_design/
 
 import React, { useState, useCallback } from 'react';
 import {
@@ -15,15 +19,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { productivityApi } from '../../api/productivity';
 import { focusSessionsApi } from '../../api/focusSessions';
 import { tasksApi } from '../../api/tasks';
 import { offlineCache } from '../../cache/offlineCache';
-import { colors, spacing, borderRadius, typography, layout } from '../../theme';
 import { formatTimerSeconds } from '../../services/timerEngine';
+import { GlassCard, MetricBadge, KineticButton, ScreenHeader } from '../../components';
 
 export const HomeScreen: React.FC = () => {
   const { user } = useAuth();
+  const { colors, typography, spacing, borderRadius, isDark } = useTheme();
   const router = useRouter();
   const queryClient = useQueryClient();
   const [refreshing, setRefreshing] = useState(false);
@@ -48,7 +54,7 @@ export const HomeScreen: React.FC = () => {
   const { data: activeSession } = useQuery({
     queryKey: ['activeFocusSession'],
     queryFn: () => focusSessionsApi.getActiveSession(),
-    refetchInterval: 5000, // Background poll every 5s for multi-device sync
+    refetchInterval: 5000,
   });
 
   // 3. Priority Tasks Query
@@ -77,11 +83,20 @@ export const HomeScreen: React.FC = () => {
   }, [queryClient]);
 
   const topTask = tasks[0];
+  const completedPomodoros = summary?.completedSessions || 0;
+  const targetGoal = summary?.dailyGoalSeconds ? Math.round(summary.dailyGoalSeconds / (25 * 60)) : 4;
+  const streakDays = summary?.streakCount || 0;
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.canvas }]} edges={['top']}>
+      {/* HUD Header */}
+      <ScreenHeader
+        title="FocusFlow"
+        statusText="SYS.FLOW v4.2"
+      />
+
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: spacing.bottomDockHeight + 40 }]}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
@@ -91,157 +106,189 @@ export const HomeScreen: React.FC = () => {
           />
         }
       >
-        {/* User Greeting */}
-        <View style={styles.header}>
-          <Text style={styles.greeting} accessibilityRole="header">
-            Welcome, {user?.name || 'Focus Achiever'}
+        {/* User Greeting & Sync Status */}
+        <View style={styles.greetingSection}>
+          <View style={styles.greetingRow}>
+            <Text
+              style={[
+                typography.headlineMd,
+                { color: colors.text },
+              ]}
+              numberOfLines={1}
+            >
+              Welcome, {user?.name?.split(' ')[0] || 'Alex'}
+            </Text>
+            <MetricBadge
+              type="status"
+              label="SYNCED"
+              color={colors.secondary}
+              variant="secondary"
+            />
+          </View>
+          <Text style={[typography.body, { color: colors.textSecondary }]}>
+            Here is your tactical productivity snapshot for today.
           </Text>
-          <Text style={styles.subGreeting}>Here is your productivity snapshot for today.</Text>
         </View>
 
         {/* Offline Banner if degraded */}
         {isSummaryError && (
-          <View style={styles.offlineBanner} accessibilityRole="alert">
-            <Text style={styles.offlineText}>⚠️ Displaying offline cached metrics</Text>
-          </View>
-        )}
-
-        {/* Active Session Card (if session is ongoing) */}
-        {activeSession ? (
-          <TouchableOpacity
-            style={styles.activeSessionCard}
-            onPress={() => navigation.navigate('Focus')}
-            accessibilityRole="button"
-            accessibilityLabel="Active session running. Tap to return to Focus timer"
-            activeOpacity={0.8}
-          >
-            <View style={styles.activeCardHeader}>
-              <View style={styles.liveIndicator}>
-                <View style={styles.liveDot} />
-                <Text style={styles.liveText}>
-                  {activeSession.status === 'PAUSED' ? 'PAUSED' : 'SESSION IN PROGRESS'}
-                </Text>
-              </View>
-              <Text style={styles.tapToOpen}>Open Timer →</Text>
-            </View>
-
-            <Text style={styles.activeSessionTitle} numberOfLines={1}>
-              {activeSession.task?.title || 'General Focus Session'}
+          <GlassCard level={2} style={styles.bannerCard}>
+            <Text style={[typography.caption, { color: colors.warning }]}>
+              Telemetry in offline cached state
             </Text>
-            {activeSession.project && (
-              <View style={styles.projectBadge}>
-                <View style={[styles.projectDot, { backgroundColor: activeSession.project.color }]} />
-                <Text style={styles.projectBadgeText}>{activeSession.project.name}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-        ) : (
-          <View style={styles.quickStartCard}>
-            <View style={styles.quickStartTextContainer}>
-              <Text style={styles.quickStartTitle}>Ready to Focus?</Text>
-              <Text style={styles.quickStartSubtitle}>
-                {topTask ? `Next: "${topTask.title}"` : 'Start a 25-minute Pomodoro session.'}
-              </Text>
-            </View>
-            <TouchableOpacity
-              style={styles.quickStartButton}
-              onPress={() => router.push('/(tabs)/focus')}
-              accessibilityRole="button"
-              accessibilityLabel="Start focus session"
-              activeOpacity={0.8}
-            >
-              <Text style={styles.quickStartButtonText}>Start ⚡</Text>
-            </TouchableOpacity>
-          </View>
+          </GlassCard>
         )}
 
-        {/* Daily Stats Grid */}
-        <View style={styles.statsGrid}>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Today's Focus</Text>
+        {/* Hero: Tactical Flow Launch Module */}
+        <GlassCard level={2} glowColor={colors.primaryGlow} style={styles.heroCard}>
+          <View style={styles.heroHeader}>
+            <View style={styles.directiveRow}>
+              <MetricBadge type="velocity" label="MISSION DIRECTIVE" color={colors.secondary} />
+            </View>
+            <MetricBadge type="status" label="25M SPRINT" color={colors.primaryLight} />
+          </View>
+
+          <Text style={[typography.headlineSm, styles.heroTitle, { color: colors.text }]}>
+            {activeSession ? 'Session in Progress' : 'Ready to Focus?'}
+          </Text>
+
+          <Text style={[typography.bodySm, { color: colors.textSecondary }]} numberOfLines={2}>
+            Next:{' '}
+            <Text style={{ color: colors.text, fontWeight: '600' }}>
+              "{activeSession?.task?.title || topTask?.title || 'Deep Work Sprint'}"
+            </Text>
+          </Text>
+
+          <View style={styles.heroActionRow}>
+            <KineticButton
+              title={activeSession ? 'RESUME FOCUS' : 'ENGAGE FOCUS'}
+              variant="primary"
+              size="md"
+              style={styles.engageButton}
+              onPress={() => router.push('/(tabs)/focus')}
+            />
+          </View>
+        </GlassCard>
+
+        {/* Telemetry Matrix (2x2 KPI Grid) */}
+        <View style={styles.sectionHeader}>
+          <Text style={[typography.labelCaps, { color: colors.textSecondary }]}>
+            TELEMETRY SNAPSHOT
+          </Text>
+        </View>
+
+        <View style={styles.matrixGrid}>
+          {/* 1. Today's Focus Time */}
+          <GlassCard level={1} style={styles.matrixCard}>
+            <Text style={[typography.labelCaps, styles.matrixLabel, { color: colors.textSecondary }]}>
+              FOCUS TIME
+            </Text>
             {isSummaryLoading ? (
               <ActivityIndicator color={colors.primaryLight} size="small" />
             ) : (
-              <Text style={styles.statValue}>
+              <Text style={[typography.headlineSm, styles.matrixValue, { color: colors.text }]}>
                 {formatTimerSeconds(summary?.todayFocusSeconds || 0)}
               </Text>
             )}
-          </View>
+            <View style={styles.matrixSubRow}>
+              <MetricBadge type="velocity" value="TODAY" color={colors.secondary} />
+            </View>
+          </GlassCard>
 
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Completed</Text>
+          {/* 2. Pomodoro Progress */}
+          <GlassCard level={1} style={styles.matrixCard}>
+            <Text style={[typography.labelCaps, styles.matrixLabel, { color: colors.textSecondary }]}>
+              COMPLETED
+            </Text>
             {isSummaryLoading ? (
               <ActivityIndicator color={colors.primaryLight} size="small" />
             ) : (
-              <Text style={styles.statValue}>
-                {summary?.completedSessions || 0} 🍅
+              <Text style={[typography.headlineSm, styles.matrixValue, { color: colors.text }]}>
+                {completedPomodoros} / {targetGoal}
               </Text>
             )}
-          </View>
+            <View style={styles.matrixSubRow}>
+              <MetricBadge type="session" label="INTERVALS" color={colors.primaryLight} />
+            </View>
+          </GlassCard>
 
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Completion Rate</Text>
+          {/* 3. Streak Count */}
+          <GlassCard level={1} style={styles.matrixCard}>
+            <Text style={[typography.labelCaps, styles.matrixLabel, { color: colors.textSecondary }]}>
+              STREAK
+            </Text>
             {isSummaryLoading ? (
               <ActivityIndicator color={colors.primaryLight} size="small" />
             ) : (
-              <Text style={styles.statValue}>
-                {summary?.completionRate ? `${Math.round(summary.completionRate)}%` : '100%'}
+              <Text style={[typography.headlineSm, styles.matrixValue, { color: colors.text }]}>
+                {streakDays} {streakDays === 1 ? 'DAY' : 'DAYS'}
               </Text>
             )}
-          </View>
+            <View style={styles.matrixSubRow}>
+              <MetricBadge type="streak" label="ACTIVE" color={colors.tertiary} />
+            </View>
+          </GlassCard>
 
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Streak</Text>
-            {isSummaryLoading ? (
-              <ActivityIndicator color={colors.primaryLight} size="small" />
-            ) : (
-              <Text style={styles.statValue}>
-                {summary?.streakCount || 0} {summary?.streakCount === 1 ? 'day' : 'days'} 🔥
-              </Text>
-            )}
-          </View>
+          {/* 4. Active Tasks Count */}
+          <GlassCard level={1} style={styles.matrixCard}>
+            <Text style={[typography.labelCaps, styles.matrixLabel, { color: colors.textSecondary }]}>
+              BACKLOG
+            </Text>
+            <Text style={[typography.headlineSm, styles.matrixValue, { color: colors.text }]}>
+              {tasks.length} PENDING
+            </Text>
+            <View style={styles.matrixSubRow}>
+              <MetricBadge type="status" value="QUEUE" color={colors.secondary} />
+            </View>
+          </GlassCard>
         </View>
 
-        {/* Priority Tasks Section */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Priority Tasks</Text>
-          <TouchableOpacity
-            onPress={() => router.push('/(tabs)/tasks')}
-            accessibilityRole="button"
-            accessibilityLabel="View all tasks"
-          >
-            <Text style={styles.seeAllLink}>See all ({tasks.length}) →</Text>
+        {/* Priority Directives Queue */}
+        <View style={styles.sectionHeaderBetween}>
+          <Text style={[typography.labelCaps, { color: colors.textSecondary }]}>
+            PRIORITY DIRECTIVES
+          </Text>
+          <TouchableOpacity onPress={() => router.push('/(tabs)/tasks')}>
+            <Text style={[typography.labelCaps, { color: colors.primary }]}>
+              VIEW ALL ({tasks.length}) →
+            </Text>
           </TouchableOpacity>
         </View>
 
         {tasks.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Text style={styles.emptyText}>No pending tasks. You are all caught up!</Text>
-          </View>
+          <GlassCard level={1} style={styles.emptyCard}>
+            <Text style={[typography.body, { color: colors.textSecondary }]}>
+              No pending tasks. You are ready to configure new directives.
+            </Text>
+            <KineticButton
+              title="ADD OBJECTIVE"
+              variant="secondary"
+              size="sm"
+              style={{ marginTop: 12 }}
+              onPress={() => router.push('/(tabs)/tasks')}
+            />
+          </GlassCard>
         ) : (
           tasks.slice(0, 3).map((task) => (
-            <TouchableOpacity
-              key={task.id}
-              style={styles.taskCard}
-              onPress={() => router.push('/(tabs)/tasks')}
-              accessibilityRole="button"
-              accessibilityLabel={`Task: ${task.title}`}
-              activeOpacity={0.7}
-            >
-              <View style={styles.taskInfo}>
-                <Text style={styles.taskTitle} numberOfLines={1}>
-                  {task.title}
-                </Text>
-                {task.project && (
-                  <Text style={styles.taskProject} numberOfLines={1}>
-                    📁 {task.project.name}
+            <GlassCard key={task.id} level={1} style={styles.taskCard}>
+              <View style={styles.taskCardHeader}>
+                <View style={styles.taskProjectTag}>
+                  <View style={[styles.projectDot, { backgroundColor: colors.secondary }]} />
+                  <Text style={[typography.labelCaps, { color: colors.textSecondary }]}>
+                    {task.project?.name || 'General Focus'}
                   </Text>
-                )}
+                </View>
+                <MetricBadge
+                  type="status"
+                  label={task.priority}
+                  color={task.priority === 'HIGH' ? colors.danger : colors.secondary}
+                />
               </View>
-              <View style={styles.taskBadge}>
-                <Text style={styles.taskBadgeText}>{task.priority}</Text>
-              </View>
-            </TouchableOpacity>
+
+              <Text style={[typography.bodyBold, styles.taskTitle, { color: colors.text }]} numberOfLines={1}>
+                {task.title}
+              </Text>
+            </GlassCard>
           ))
         )}
       </ScrollView>
@@ -252,202 +299,102 @@ export const HomeScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   scrollContent: {
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
-    gap: spacing.xl,
+    paddingHorizontal: 16,
+    gap: 16,
   },
-  header: {
-    gap: spacing.xs,
+  greetingSection: {
+    gap: 4,
+    marginTop: 4,
   },
-  greeting: {
-    ...typography.h2,
-    color: colors.text,
-  },
-  subGreeting: {
-    ...typography.body,
-    color: colors.textSecondary,
-  },
-  offlineBanner: {
-    backgroundColor: colors.warningMuted,
-    borderWidth: 1,
-    borderColor: colors.warning,
-    borderRadius: borderRadius.md,
-    padding: spacing.sm,
-  },
-  offlineText: {
-    ...typography.caption,
-    color: colors.warning,
-    textAlign: 'center',
-  },
-  activeSessionCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    gap: spacing.sm,
-  },
-  activeCardHeader: {
+  greetingRow: {
     flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  bannerCard: {
+    padding: 10,
     alignItems: 'center',
   },
-  liveIndicator: {
+  heroCard: {
+    padding: 16,
+    gap: 10,
+  },
+  heroHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+    justifyContent: 'space-between',
   },
-  liveDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.success,
-  },
-  liveText: {
-    ...typography.tiny,
-    color: colors.primaryLight,
-    letterSpacing: 0.5,
-  },
-  tapToOpen: {
-    ...typography.caption,
-    color: colors.primaryLight,
-  },
-  activeSessionTitle: {
-    ...typography.h3,
-    color: colors.text,
-  },
-  projectBadge: {
+  directiveRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.xs,
+  },
+  heroTitle: {
+    letterSpacing: -0.3,
+  },
+  heroActionRow: {
+    flexDirection: 'row',
+    marginTop: 4,
+  },
+  engageButton: {
+    flex: 1,
+  },
+  sectionHeader: {
+    marginTop: 4,
+  },
+  sectionHeaderBetween: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginTop: 8,
+  },
+  matrixGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  matrixCard: {
+    width: '48%',
+    padding: 14,
+    gap: 6,
+  },
+  matrixLabel: {
+    fontSize: 10,
+  },
+  matrixValue: {
+    fontSize: 20,
+    fontWeight: '700',
+  },
+  matrixSubRow: {
+    flexDirection: 'row',
+    marginTop: 2,
+  },
+  taskCard: {
+    padding: 14,
+    gap: 8,
+  },
+  taskCardHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  taskProjectTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
   },
   projectDot: {
     width: 6,
     height: 6,
     borderRadius: 3,
   },
-  projectBadgeText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  quickStartCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.lg,
-    padding: spacing.lg,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  quickStartTextContainer: {
-    flex: 1,
-    marginRight: spacing.md,
-  },
-  quickStartTitle: {
-    ...typography.h3,
-    color: colors.text,
-    marginBottom: spacing.xs,
-  },
-  quickStartSubtitle: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  quickStartButton: {
-    height: layout.minTouchTarget,
-    paddingHorizontal: spacing.lg,
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.md,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  quickStartButtonText: {
-    ...typography.bodyBold,
-    color: colors.text,
-  },
-  statsGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.md,
-  },
-  statCard: {
-    flex: 1,
-    minWidth: '45%',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    gap: spacing.xs,
-  },
-  statLabel: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  statValue: {
-    ...typography.h2,
-    color: colors.text,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  sectionTitle: {
-    ...typography.h3,
-    color: colors.text,
-  },
-  seeAllLink: {
-    ...typography.caption,
-    color: colors.primaryLight,
+  taskTitle: {
+    fontSize: 15,
   },
   emptyCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    padding: spacing.lg,
+    padding: 20,
     alignItems: 'center',
-  },
-  emptyText: {
-    ...typography.body,
-    color: colors.textMuted,
-  },
-  taskCard: {
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    minHeight: layout.minTouchTarget,
-  },
-  taskInfo: {
-    flex: 1,
-    marginRight: spacing.sm,
-    gap: spacing.xs,
-  },
-  taskTitle: {
-    ...typography.bodyMedium,
-    color: colors.text,
-  },
-  taskProject: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  taskBadge: {
-    backgroundColor: colors.surfaceLight,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.sm,
-  },
-  taskBadgeText: {
-    ...typography.tiny,
-    color: colors.textSecondary,
+    justifyContent: 'center',
   },
 });

@@ -54,7 +54,7 @@ export function reconcileSessionTimer(session: FocusSession | null): TimerDispla
     };
   }
 
-  if (session.status === 'ACTIVE' || session.status === 'IN_PROGRESS') {
+  if (session.status === 'ACTIVE' || (session.status as string) === 'IN_PROGRESS') {
     const nowMs = Date.now();
     const startedAtMs = new Date(session.startedAt).getTime();
     const pauseSeconds = (session as any).pausedDuration ?? session.pauseSeconds ?? 0;

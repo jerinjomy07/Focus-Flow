@@ -1,10 +1,11 @@
 // mobile/src/screens/focus/FocusScreen.tsx
-// FocusFlow Mobile — Native Pomodoro Focus Timer Screen
+// FocusFlow Mobile — Native Pomodoro Focus Timer Screen (Stitch Redesign)
 //
-// Strictly preserves Phase 6 server-authoritative timer semantics.
-// Reconciles on app foregrounding, screen lock/unlock, and network recovery.
+// Source of Truth:
+// - Dark: mobile/design/stitch_focusflow_futuristic_redesign/focus_timer_signature/
+// - Light: mobile/design/stitch_focusflow_futuristic_redesign/focus_timer_terra_design/
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -12,8 +13,8 @@ import {
   TouchableOpacity,
   Modal,
   FlatList,
-  ActivityIndicator,
   Alert,
+  ScrollView,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -21,7 +22,7 @@ import { focusSessionsApi } from '../../api/focusSessions';
 import { tasksApi } from '../../api/tasks';
 import { settingsApi } from '../../api/settings';
 import { Task, SessionType } from '../../types';
-import { colors, spacing, borderRadius, typography, layout } from '../../theme';
+import { useTheme } from '../../context/ThemeContext';
 import {
   reconcileSessionTimer,
   formatTimerSeconds,
@@ -30,8 +31,10 @@ import {
 } from '../../services/timerEngine';
 import { audioHapticsService } from '../../services/audioHapticsService';
 import { notificationService } from '../../services/notificationService';
+import { GlassCard, KineticButton, MetricBadge, ScreenHeader, TelemetryRing } from '../../components';
 
 export const FocusScreen: React.FC = () => {
+  const { colors, typography, spacing, borderRadius, isDark } = useTheme();
   const queryClient = useQueryClient();
 
   const [selectedType, setSelectedType] = useState<SessionType>('POMODORO');
@@ -54,7 +57,7 @@ export const FocusScreen: React.FC = () => {
   });
 
   // 2. Fetch active focus session from server
-  const { data: activeSession, isLoading: isSessionLoading } = useQuery({
+  const { data: activeSession } = useQuery({
     queryKey: ['activeFocusSession'],
     queryFn: () => focusSessionsApi.getActiveSession(),
     refetchInterval: 10000,
@@ -100,7 +103,6 @@ export const FocusScreen: React.FC = () => {
       setDisplayState((prev) => {
         if (prev.remainingSeconds <= 1) {
           clearInterval(interval);
-          // Session completed naturally!
           handleNaturalCompletion();
           return {
             ...prev,
@@ -226,212 +228,276 @@ export const FocusScreen: React.FC = () => {
     completeMutation.isPending ||
     resetMutation.isPending;
 
+  const targetTaskTitle =
+    activeSession?.task?.title || selectedTask?.title || 'No task selected (Tap to attach)';
+
+  const getStatusText = () => {
+    if (displayState.status === 'RUNNING') {
+      const minutes = Math.round(displayState.totalDurationSeconds / 60);
+      return `IN PROGRESS • ${minutes}M DEEP`;
+    }
+    if (displayState.status === 'PAUSED') return 'PAUSED';
+    if (displayState.status === 'COMPLETED') return 'CYCLE COMPLETED';
+    return 'READY TO ENGAGE';
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
-      <View style={styles.content}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.canvas }]} edges={['top']}>
+      {/* HUD Screen Header */}
+      <ScreenHeader
+        title={selectedType === 'POMODORO' ? 'Focus Timer' : 'Rest Interval'}
+        statusText="FLOW PROTOCOL"
+      />
+
+      <ScrollView
+        contentContainerStyle={[styles.scrollContent, { paddingBottom: spacing.bottomDockHeight + 36 }]}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Session Type Switcher (only selectable when IDLE) */}
         {displayState.status === 'IDLE' && (
-          <View style={styles.typeSelector}>
-            {(['POMODORO', 'SHORT_BREAK', 'LONG_BREAK'] as SessionType[]).map((type) => (
-              <TouchableOpacity
-                key={type}
-                style={[
-                  styles.typeTab,
-                  selectedType === type && styles.typeTabActive,
-                ]}
-                onPress={() => setSelectedType(type)}
-                accessibilityRole="button"
-                accessibilityLabel={`Select ${type} interval`}
-              >
-                <Text
+          <View style={styles.typeSelectorRow}>
+            {(['POMODORO', 'SHORT_BREAK', 'LONG_BREAK'] as SessionType[]).map((type) => {
+              const isActive = selectedType === type;
+              return (
+                <TouchableOpacity
+                  key={type}
                   style={[
-                    styles.typeTabText,
-                    selectedType === type && styles.typeTabTextActive,
+                    styles.typePill,
+                    {
+                      backgroundColor: isActive
+                        ? colors.primary
+                        : isDark
+                        ? 'rgba(26, 32, 44, 0.7)'
+                        : 'rgba(233, 228, 217, 0.6)',
+                      borderColor: isActive ? colors.primaryLight : colors.border,
+                    },
+                    isActive && isDark && {
+                      shadowColor: colors.primary,
+                      shadowOffset: { width: 0, height: 0 },
+                      shadowOpacity: 0.4,
+                      shadowRadius: 8,
+                      elevation: 3,
+                    },
                   ]}
+                  onPress={() => setSelectedType(type)}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Select ${type} interval`}
                 >
-                  {type === 'POMODORO' ? 'Focus' : type === 'SHORT_BREAK' ? 'Short Break' : 'Long Break'}
-                </Text>
-              </TouchableOpacity>
-            ))}
+                  <Text
+                    style={[
+                      typography.labelCaps,
+                      { color: isActive ? colors.onPrimary : colors.textSecondary },
+                    ]}
+                  >
+                    {type === 'POMODORO' ? 'Focus' : type === 'SHORT_BREAK' ? 'Short Break' : 'Long Break'}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         )}
 
-        {/* Active Task / Project Indicator */}
+        {/* Attached Objective Card */}
         <TouchableOpacity
-          style={styles.taskSelector}
           onPress={() => displayState.status === 'IDLE' && setIsTaskModalVisible(true)}
           disabled={displayState.status !== 'IDLE'}
-          accessibilityRole="button"
-          accessibilityLabel={selectedTask ? `Active task: ${selectedTask.title}` : 'Attach task'}
+          activeOpacity={0.8}
         >
-          <Text style={styles.taskSelectorLabel}>TARGET TASK</Text>
-          <Text style={styles.taskSelectorTitle} numberOfLines={1}>
-            {activeSession?.task?.title || selectedTask?.title || 'No task selected (Tap to attach)'}
-          </Text>
+          <GlassCard level={1} style={styles.objectiveCard}>
+            <View style={styles.objectiveHeader}>
+              <MetricBadge type="status" label="ATTACHED OBJECTIVE" color={colors.secondary} />
+              {displayState.status === 'IDLE' && (
+                <Text style={[typography.caption, { color: colors.primary }]}>
+                  SELECT →
+                </Text>
+              )}
+            </View>
+            <Text
+              style={[typography.bodyBold, styles.objectiveTitle, { color: colors.text }]}
+              numberOfLines={1}
+            >
+              {targetTaskTitle}
+            </Text>
+          </GlassCard>
         </TouchableOpacity>
 
-        {/* Timer Display Display Ring */}
-        <View style={styles.timerDisplayContainer}>
-          <View style={styles.progressRingOuter}>
-            <View style={styles.progressRingInner}>
-              <Text
-                style={styles.timerText}
-                accessibilityRole="text"
-                accessibilityLabel={`${formatTimerSeconds(displayState.remainingSeconds)} remaining`}
-              >
-                {formatTimerSeconds(displayState.remainingSeconds)}
-              </Text>
-              <Text style={styles.timerStatusBadge}>
-                {displayState.status === 'RUNNING'
-                  ? '⚡ IN PROGRESS'
-                  : displayState.status === 'PAUSED'
-                  ? '⏸ PAUSED'
-                  : displayState.status === 'COMPLETED'
-                  ? '🎉 COMPLETED'
-                  : 'READY'}
-              </Text>
-            </View>
-          </View>
+        {/* Central Futuristic Kinetic Timer Core */}
+        <View style={styles.dialWrapper}>
+          <TelemetryRing
+            progressPercent={displayState.progressPercent}
+            timeDisplay={formatTimerSeconds(displayState.remainingSeconds)}
+            statusText={getStatusText()}
+            cycleText="CYCLE 01 • INTERVAL 04"
+            completedIntervals={1}
+            totalIntervals={4}
+          />
         </View>
 
-        {/* Action Controls */}
-        <View style={styles.controlsContainer}>
-          {displayState.status === 'IDLE' && (
-            <View style={styles.actionButtonGroup}>
-              <TouchableOpacity
-                style={[styles.primaryActionButton, isBusy && styles.buttonDisabled]}
-                onPress={() => startMutation.mutate()}
-                disabled={isBusy}
-                accessibilityRole="button"
-                accessibilityLabel="Start timer"
-                activeOpacity={0.8}
-              >
-                {isBusy ? (
-                  <ActivityIndicator color={colors.text} />
-                ) : (
-                  <Text style={styles.primaryActionText}>Start Session</Text>
-                )}
-              </TouchableOpacity>
+        {/* Session Context Chips */}
+        <View style={styles.contextGrid}>
+          <GlassCard level={1} style={styles.contextChip}>
+            <View style={styles.contextRow}>
+              <Text style={[typography.labelCaps, { color: colors.textSecondary, fontSize: 10 }]}>
+                SOUNDSCAPE
+              </Text>
+              <MetricBadge type="velocity" color={colors.secondary} />
             </View>
+            <Text style={[typography.bodySm, { color: colors.text, fontWeight: '600', marginTop: 4 }]}>
+              {settings?.soundEnabled ? 'Chime Active' : 'Silent Focus'}
+            </Text>
+          </GlassCard>
+
+          <GlassCard level={1} style={styles.contextChip}>
+            <View style={styles.contextRow}>
+              <Text style={[typography.labelCaps, { color: colors.textSecondary, fontSize: 10 }]}>
+                FLOW CONFIG
+              </Text>
+              <MetricBadge type="session" color={colors.primaryLight} />
+            </View>
+            <Text style={[typography.bodySm, { color: colors.text, fontWeight: '600', marginTop: 4 }]}>
+              {settings?.focusDurationMinutes || 25}M • 5M Break
+            </Text>
+          </GlassCard>
+        </View>
+
+        {/* Kinetic Action Controls */}
+        <View style={styles.controlsRow}>
+          {displayState.status === 'IDLE' && (
+            <KineticButton
+              title="ENGAGE FOCUS"
+              variant="primary"
+              size="lg"
+              loading={isBusy}
+              style={{ flex: 1 }}
+              onPress={() => startMutation.mutate()}
+            />
           )}
 
           {displayState.status === 'RUNNING' && (
-            <View style={styles.actionButtonGroup}>
-              <TouchableOpacity
-                style={[styles.secondaryActionButton, isBusy && styles.buttonDisabled]}
+            <View style={styles.dualControls}>
+              <KineticButton
+                title="PAUSE ⏸"
+                variant="secondary"
+                size="md"
+                style={{ flex: 1 }}
+                loading={isBusy}
                 onPress={() => pauseMutation.mutate()}
-                disabled={isBusy}
-                accessibilityRole="button"
-                accessibilityLabel="Pause timer"
-              >
-                <Text style={styles.secondaryActionText}>Pause ⏸</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.primaryActionButton, isBusy && styles.buttonDisabled]}
+              />
+              <KineticButton
+                title="COMPLETE ✓"
+                variant="primary"
+                size="md"
+                style={{ flex: 1 }}
+                loading={isBusy}
                 onPress={() => completeMutation.mutate()}
-                disabled={isBusy}
-                accessibilityRole="button"
-                accessibilityLabel="Complete session"
-              >
-                <Text style={styles.primaryActionText}>Complete ✓</Text>
-              </TouchableOpacity>
+              />
             </View>
           )}
 
           {displayState.status === 'PAUSED' && (
-            <View style={styles.actionButtonGroup}>
-              <TouchableOpacity
-                style={[styles.primaryActionButton, isBusy && styles.buttonDisabled]}
+            <View style={styles.dualControls}>
+              <KineticButton
+                title="RESUME ▶"
+                variant="primary"
+                size="md"
+                style={{ flex: 1 }}
+                loading={isBusy}
                 onPress={() => resumeMutation.mutate()}
-                disabled={isBusy}
-                accessibilityRole="button"
-                accessibilityLabel="Resume timer"
-              >
-                <Text style={styles.primaryActionText}>Resume ▶</Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                style={[styles.dangerActionButton, isBusy && styles.buttonDisabled]}
+              />
+              <KineticButton
+                title="RESET ↺"
+                variant="danger"
+                size="md"
+                style={{ flex: 1 }}
+                loading={isBusy}
                 onPress={() => resetMutation.mutate()}
-                disabled={isBusy}
-                accessibilityRole="button"
-                accessibilityLabel="Reset timer session"
-              >
-                <Text style={styles.dangerActionText}>Reset ↺</Text>
-              </TouchableOpacity>
+              />
             </View>
           )}
 
           {displayState.status === 'COMPLETED' && (
-            <TouchableOpacity
-              style={styles.primaryActionButton}
+            <KineticButton
+              title="START NEXT SESSION →"
+              variant="primary"
+              size="lg"
+              loading={isBusy}
+              style={{ flex: 1 }}
               onPress={() => {
                 queryClient.invalidateQueries({ queryKey: ['activeFocusSession'] });
               }}
-              accessibilityRole="button"
-              accessibilityLabel="Start another session"
-            >
-              <Text style={styles.primaryActionText}>Start Next Session →</Text>
-            </TouchableOpacity>
+            />
           )}
         </View>
+      </ScrollView>
 
-        {/* Task Selection Modal */}
-        <Modal
-          visible={isTaskModalVisible}
-          animationType="slide"
-          transparent={true}
-          onRequestClose={() => setIsTaskModalVisible(false)}
-        >
-          <View style={styles.modalOverlay}>
-            <View style={styles.modalContent}>
-              <View style={styles.modalHeader}>
-                <Text style={styles.modalTitle}>Attach Task to Session</Text>
-                <TouchableOpacity
-                  onPress={() => setIsTaskModalVisible(false)}
-                  style={styles.modalCloseButton}
-                  accessibilityRole="button"
-                  accessibilityLabel="Close task selection"
-                >
-                  <Text style={styles.modalCloseText}>✕</Text>
-                </TouchableOpacity>
-              </View>
+      {/* Task Attachment Selection Modal */}
+      <Modal
+        visible={isTaskModalVisible}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setIsTaskModalVisible(false)}
+      >
+        <View style={styles.modalBackdrop}>
+          <GlassCard level={3} style={styles.modalSheet}>
+            <View style={styles.modalHeader}>
+              <Text style={[typography.headlineSm, { color: colors.text }]}>
+                Attach Objective
+              </Text>
+              <TouchableOpacity
+                onPress={() => setIsTaskModalVisible(false)}
+                style={styles.modalCloseButton}
+              >
+                <Text style={[typography.bodyBold, { color: colors.textSecondary }]}>✕</Text>
+              </TouchableOpacity>
+            </View>
 
-              <FlatList
-                data={tasks}
-                keyExtractor={(item) => item.id}
-                renderItem={({ item }) => (
+            <FlatList
+              data={tasks}
+              keyExtractor={(item) => item.id}
+              contentContainerStyle={{ paddingVertical: 8, gap: 8 }}
+              renderItem={({ item }) => {
+                const isSelected = selectedTask?.id === item.id;
+                return (
                   <TouchableOpacity
-                    style={[
-                      styles.modalTaskItem,
-                      selectedTask?.id === item.id && styles.modalTaskItemActive,
-                    ]}
                     onPress={() => {
                       setSelectedTask(item);
                       setIsTaskModalVisible(false);
                     }}
-                    accessibilityRole="button"
-                    accessibilityLabel={`Select task: ${item.title}`}
                   >
-                    <Text style={styles.modalTaskTitle} numberOfLines={1}>
-                      {item.title}
-                    </Text>
-                    {item.project && (
-                      <Text style={styles.modalTaskProject}>📁 {item.project.name}</Text>
-                    )}
+                    <GlassCard
+                      level={isSelected ? 2 : 1}
+                      glowColor={isSelected ? colors.secondaryGlow : undefined}
+                      style={[
+                        styles.modalTaskCard,
+                        isSelected && { borderColor: colors.secondary },
+                      ]}
+                    >
+                      <Text style={[typography.bodyBold, { color: colors.text }]} numberOfLines={1}>
+                        {item.title}
+                      </Text>
+                      {item.project && (
+                        <View style={styles.projectTag}>
+                          <View style={[styles.projectDot, { backgroundColor: colors.secondary }]} />
+                          <Text style={[typography.caption, { color: colors.textSecondary }]}>
+                            {item.project.name}
+                          </Text>
+                        </View>
+                      )}
+                    </GlassCard>
                   </TouchableOpacity>
-                )}
-                ListEmptyComponent={
-                  <View style={styles.modalEmpty}>
-                    <Text style={styles.modalEmptyText}>No pending tasks found.</Text>
-                  </View>
-                }
-              />
-            </View>
-          </View>
-        </Modal>
-      </View>
+                );
+              }}
+              ListEmptyComponent={
+                <View style={styles.modalEmpty}>
+                  <Text style={[typography.body, { color: colors.textSecondary }]}>
+                    No pending tasks in backlog.
+                  </Text>
+                </View>
+              }
+            />
+          </GlassCard>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -439,200 +505,103 @@ export const FocusScreen: React.FC = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
-  content: {
+  scrollContent: {
+    paddingHorizontal: 16,
+    gap: 14,
+    alignItems: 'center',
+  },
+  typeSelectorRow: {
+    flexDirection: 'row',
+    gap: 8,
+    width: '100%',
+  },
+  typePill: {
     flex: 1,
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
+    height: 36,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  objectiveCard: {
+    width: '100%',
+    padding: 12,
+    gap: 4,
+  },
+  objectiveHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
     justifyContent: 'space-between',
-    alignItems: 'center',
   },
-  typeSelector: {
+  objectiveTitle: {
+    fontSize: 14,
+    marginTop: 2,
+  },
+  dialWrapper: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginVertical: 4,
+  },
+  contextGrid: {
     flexDirection: 'row',
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.round,
-    padding: spacing.xs,
+    gap: 12,
     width: '100%',
   },
-  typeTab: {
+  contextChip: {
     flex: 1,
-    height: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    borderRadius: borderRadius.round,
+    padding: 12,
   },
-  typeTabActive: {
-    backgroundColor: colors.primary,
-  },
-  typeTabText: {
-    ...typography.caption,
-    color: colors.textSecondary,
-  },
-  typeTabTextActive: {
-    ...typography.caption,
-    color: colors.text,
-    fontWeight: '700',
-  },
-  taskSelector: {
-    width: '100%',
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  taskSelectorLabel: {
-    ...typography.tiny,
-    color: colors.textMuted,
-    letterSpacing: 1,
-  },
-  taskSelectorTitle: {
-    ...typography.bodyMedium,
-    color: colors.text,
-  },
-  timerDisplayContainer: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginVertical: spacing.xl,
-  },
-  progressRingOuter: {
-    width: 260,
-    height: 260,
-    borderRadius: 130,
-    borderWidth: 4,
-    borderColor: colors.primary,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-  },
-  progressRingInner: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: spacing.xs,
-  },
-  timerText: {
-    ...typography.timerDisplay,
-    color: colors.text,
-  },
-  timerStatusBadge: {
-    ...typography.tiny,
-    color: colors.primaryLight,
-    letterSpacing: 1,
-  },
-  controlsContainer: {
-    width: '100%',
-    paddingBottom: spacing.lg,
-  },
-  actionButtonGroup: {
+  contextRow: {
     flexDirection: 'row',
-    gap: spacing.md,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  controlsRow: {
+    width: '100%',
+    marginTop: 6,
+  },
+  dualControls: {
+    flexDirection: 'row',
+    gap: 12,
     width: '100%',
   },
-  primaryActionButton: {
+  modalBackdrop: {
     flex: 1,
-    height: layout.minTouchTarget,
-    backgroundColor: colors.primary,
-    borderRadius: borderRadius.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  primaryActionText: {
-    ...typography.bodyBold,
-    color: colors.text,
-  },
-  secondaryActionButton: {
-    flex: 1,
-    height: layout.minTouchTarget,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  secondaryActionText: {
-    ...typography.bodyBold,
-    color: colors.text,
-  },
-  dangerActionButton: {
-    flex: 1,
-    height: layout.minTouchTarget,
-    backgroundColor: colors.dangerMuted,
-    borderWidth: 1,
-    borderColor: colors.danger,
-    borderRadius: borderRadius.lg,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  dangerActionText: {
-    ...typography.bodyBold,
-    color: colors.danger,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0, 0, 0, 0.75)',
     justifyContent: 'flex-end',
   },
-  modalContent: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    padding: spacing.xl,
-    maxHeight: '70%',
+  modalSheet: {
+    maxHeight: '65%',
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: 16,
   },
   modalHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  modalTitle: {
-    ...typography.h3,
-    color: colors.text,
+    justifyContent: 'space-between',
+    marginBottom: 12,
   },
   modalCloseButton: {
-    width: 36,
-    height: 36,
-    justifyContent: 'center',
+    padding: 6,
+  },
+  modalTaskCard: {
+    padding: 12,
+    gap: 6,
+  },
+  projectTag: {
+    flexDirection: 'row',
     alignItems: 'center',
+    gap: 6,
   },
-  modalCloseText: {
-    fontSize: 20,
-    color: colors.textSecondary,
-  },
-  modalTaskItem: {
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    borderRadius: borderRadius.md,
-    marginBottom: spacing.sm,
-    backgroundColor: colors.background,
-  },
-  modalTaskItemActive: {
-    borderColor: colors.primary,
-    backgroundColor: colors.primaryMuted,
-  },
-  modalTaskTitle: {
-    ...typography.bodyMedium,
-    color: colors.text,
-  },
-  modalTaskProject: {
-    ...typography.caption,
-    color: colors.textSecondary,
-    marginTop: spacing.xs,
+  projectDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
   modalEmpty: {
-    padding: spacing.xl,
+    padding: 24,
     alignItems: 'center',
-  },
-  modalEmptyText: {
-    ...typography.body,
-    color: colors.textMuted,
   },
 });

@@ -23,9 +23,18 @@ export interface RegisterResponse {
   user: User;
 }
 
+export interface ResetPasswordResponse {
+  success: boolean;
+  message: string;
+}
+
 export const authApi = {
   login: async (credentials: { email: string; password: string; deviceName?: string }): Promise<LoginResponse> => {
     return api.post<LoginResponse>('/auth/mobile/login', credentials);
+  },
+
+  resetPassword: async (payload: { email: string; newPassword: string }): Promise<ResetPasswordResponse> => {
+    return api.post<ResetPasswordResponse>('/auth/reset-password', payload);
   },
 
   refresh: async (refreshToken: string): Promise<RefreshResponse> => {

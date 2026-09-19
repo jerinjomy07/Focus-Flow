@@ -58,6 +58,19 @@ export const RegisterSchema = z.object({
 }).strict();
 export type RegisterInput = z.infer<typeof RegisterSchema>;
 
+export const ResetPasswordSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email('Must be a valid email address'),
+  newPassword: z
+    .string()
+    .min(8, 'Password must be at least 8 characters')
+    .max(128, 'Password must be 128 characters or fewer'),
+}).strict();
+export type ResetPasswordInput = z.infer<typeof ResetPasswordSchema>;
+
 export const LoginSchema = z.object({
   email: z
     .string()
