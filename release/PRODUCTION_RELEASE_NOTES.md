@@ -34,5 +34,7 @@
 ---
 
 ## 📦 Checksums & Verification
-- **Binary**: `FocusFlow-2.0.0-production.apk`
+- **APK**: `FocusFlow-2.0.0-production.apk`
 - **SHA-256**: `3CB46E13972617F2D08873E24F87F40E921831050B65170E68D31773BF062ADE`
+- **AAB**: `FocusFlow-2.0.0-production.aab`
+- **SHA-256**: `3FAFB6988D0E4EB1385DE41985EE29939F0EB976724D74F7D5F981C9009BE42D`

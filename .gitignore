@@ -79,4 +79,6 @@ mobile/design/
 # Local APK Binaries and Physical Screen Capture Artifacts
 *.apk
 **/*.apk
+!release/*.apk
+!release/*.aab
 physical_stitch_screen.png

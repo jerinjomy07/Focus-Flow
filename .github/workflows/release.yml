@@ -29,10 +29,10 @@ jobs:
           distribution: 'zulu'
           java-version: '17'
 
-      - name: Set up Node.js 20
+      - name: Set up Node.js 24
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
           cache-dependency-path: 'mobile/package-lock.json'
 
@@ -51,13 +51,39 @@ jobs:
 
       - name: Prepare Release Binaries
         run: |
-          if [ -f "release/FocusFlow-1.0.0-production.apk" ]; then
-            echo "Using verified pre-built production release binaries from repository"
-            cp release/FocusFlow-1.0.0-production.apk FocusFlow-v${{ env.VERSION }}.apk
-            cp release/FocusFlow-1.0.0-production.aab FocusFlow-v${{ env.VERSION }}.aab
-            cp release/FocusFlow-1.0.0-production.apk FocusFlow-1.0.0-production.apk
-            cp release/FocusFlow-1.0.0-production.aab FocusFlow-1.0.0-production.aab
-            cp release/RELEASE_CHECKSUMS.txt CHECKSUMS.txt
+          APK_SOURCE=""
+          AAB_SOURCE=""
+          if [ -f "release/FocusFlow-${{ env.VERSION }}-production.apk" ]; then
+            APK_SOURCE="release/FocusFlow-${{ env.VERSION }}-production.apk"
+          elif [ -f "release/FocusFlow-2.0.0-production.apk" ]; then
+            APK_SOURCE="release/FocusFlow-2.0.0-production.apk"
+          elif [ -f "release/FocusFlow-1.0.0-production.apk" ]; then
+            APK_SOURCE="release/FocusFlow-1.0.0-production.apk"
+          fi
+
+          if [ -f "release/FocusFlow-${{ env.VERSION }}-production.aab" ]; then
+            AAB_SOURCE="release/FocusFlow-${{ env.VERSION }}-production.aab"
+          elif [ -f "release/FocusFlow-2.0.0-production.aab" ]; then
+            AAB_SOURCE="release/FocusFlow-2.0.0-production.aab"
+          elif [ -f "release/FocusFlow-1.0.0-production.aab" ]; then
+            AAB_SOURCE="release/FocusFlow-1.0.0-production.aab"
+          fi
+
+          if [ -n "$APK_SOURCE" ]; then
+            echo "Using pre-built production release binaries: $APK_SOURCE"
+            cp "$APK_SOURCE" FocusFlow-v${{ env.VERSION }}.apk
+            cp "$APK_SOURCE" FocusFlow-${{ env.VERSION }}-production.apk
+            cp "$APK_SOURCE" FocusFlow-2.0.0-production.apk
+            if [ -n "$AAB_SOURCE" ]; then
+              cp "$AAB_SOURCE" FocusFlow-v${{ env.VERSION }}.aab
+              cp "$AAB_SOURCE" FocusFlow-${{ env.VERSION }}-production.aab
+              cp "$AAB_SOURCE" FocusFlow-2.0.0-production.aab
+            fi
+            if [ -f "release/RELEASE_CHECKSUMS.txt" ]; then
+              cp release/RELEASE_CHECKSUMS.txt CHECKSUMS.txt
+            else
+              sha256sum FocusFlow-v${{ env.VERSION }}.apk > CHECKSUMS.txt
+            fi
           else
             echo "Building from source..."
             cd mobile
@@ -68,8 +94,8 @@ jobs:
             ./gradlew assembleRelease bundleRelease --no-daemon --console=plain
             cp app/build/outputs/apk/release/app-release.apk ../../FocusFlow-v${{ env.VERSION }}.apk
             cp app/build/outputs/bundle/release/app-release.aab ../../FocusFlow-v${{ env.VERSION }}.aab
-            cp app/build/outputs/apk/release/app-release.apk ../../FocusFlow-1.0.0-production.apk
-            cp app/build/outputs/bundle/release/app-release.aab ../../FocusFlow-1.0.0-production.aab
+            cp app/build/outputs/apk/release/app-release.apk ../../FocusFlow-${{ env.VERSION }}-production.apk
+            cp app/build/outputs/bundle/release/app-release.aab ../../FocusFlow-${{ env.VERSION }}-production.aab
             sha256sum FocusFlow-v${{ env.VERSION }}.apk > CHECKSUMS.txt
             sha256sum FocusFlow-v${{ env.VERSION }}.aab >> CHECKSUMS.txt
           fi
@@ -86,23 +112,25 @@ jobs:
           files: |
             FocusFlow-v${{ env.VERSION }}.apk
             FocusFlow-v${{ env.VERSION }}.aab
-            FocusFlow-1.0.0-production.apk
-            FocusFlow-1.0.0-production.aab
+            FocusFlow-2.0.0-production.apk
+            FocusFlow-2.0.0-production.aab
             CHECKSUMS.txt
           body: |
-            ## ? FocusFlow v${{ env.VERSION }} — Production Standalone Android Release
+            ## 🚀 FocusFlow v${{ env.VERSION }} — Production Standalone Android Release
 
             Download the standalone APK below to install and run FocusFlow directly on your Android phone (Android 7.0+ / SDK 24 to 36).
 
-            ### ?? Download Assets
-            - **[FocusFlow-v${{ env.VERSION }}.apk](https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/FocusFlow-v${{ env.VERSION }}.apk)** *(Direct Installable APK)*
-            - **[FocusFlow-v${{ env.VERSION }}.aab](https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/FocusFlow-v${{ env.VERSION }}.aab)** *(Google Play Bundle)*
+            ### 📦 Download Assets
+            - **[FocusFlow-2.0.0-production.apk](https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/FocusFlow-2.0.0-production.apk)** *(Direct Installable APK)*
+            - **[FocusFlow-v${{ env.VERSION }}.apk](https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/FocusFlow-v${{ env.VERSION }}.apk)** *(Versioned APK)*
+            - **[FocusFlow-2.0.0-production.aab](https://github.com/${{ github.repository }}/releases/download/v${{ env.VERSION }}/FocusFlow-2.0.0-production.aab)** *(Google Play Bundle)*
 
-            ### ?? Highlights & Features:
+            ### ⚡ Highlights & Features:
             - **Pure Standalone Android Client**: Genuine React Native + Expo binary running on Hermes V12 with ProGuard optimization.
+            - **Google Stitch Futuristic UI**: Obsidian Kinetic and Terra color systems with dynamic SVG morphing and custom project presets.
             - **Deterministic Timestamp Timer**: Zero-drift target-end-time wall-clock reconciliation across background and foreground states.
+            - **Hardened Email OTP Password Reset**: 6-digit cryptographic verification codes with Resend API integration.
             - **Hardware-Backed Keystore Security**: Dual-token authentication with rotating refresh tokens and replay detection via `expo-secure-store`.
             - **Cloud & Cross-Platform Sync**: Seamless real-time synchronization with Neon PostgreSQL and Vercel serverless platform.
-            - **Full Productivity Suite**: Pomodoro timer, task backlog with priority tags, session audit history, and weekly productivity analytics.
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
