@@ -13,7 +13,7 @@ export async function sendPasswordResetOtpEmail(
   otp: string
 ): Promise<SendEmailResult> {
   const resendApiKey = process.env.RESEND_API_KEY;
-  const fromEmail = process.env.EMAIL_FROM || 'FocusFlow Security <security@focusflow.app>';
+  const fromEmail = process.env.EMAIL_FROM || 'FocusFlow <onboarding@resend.dev>';
 
   const subject = `FocusFlow Security: Your Verification Code is ${otp}`;
   const htmlContent = `
@@ -89,16 +89,17 @@ export async function sendPasswordResetOtpEmail(
     }
   }
 
-  // 2. Fallback / Dev mode: Log cleanly to console and provide devOtp for testing
+  // 2. Fallback / Dev mode: Log cleanly to console and provide devOtp for instant testing
   console.log(`\n==================================================`);
-  console.log(`[EMAIL DISPATCHER (DEV/TEST)]`);
+  console.log(`[EMAIL DISPATCHER (DEV/TEST/NO-API-KEY)]`);
   console.log(`To: ${toEmail}`);
   console.log(`OTP Code: ${otp}`);
   console.log(`Expires in: 10 minutes`);
+  console.log(`Tip: Set RESEND_API_KEY environment variable in Vercel for real inbox delivery.`);
   console.log(`==================================================\n`);
 
   return {
     success: true,
-    devOtp: process.env.NODE_ENV !== 'production' ? otp : undefined,
+    devOtp: otp,
   };
 }

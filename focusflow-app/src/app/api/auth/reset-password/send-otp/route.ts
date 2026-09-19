@@ -99,10 +99,15 @@ export async function POST(req: Request) {
     // Dispatch email
     const emailResult = await sendPasswordResetOtpEmail(normalizedEmail, otp);
 
+    const isEmailConfigured = Boolean(process.env.RESEND_API_KEY);
+    const message = isEmailConfigured
+      ? `A 6-digit verification code has been sent to ${normalizedEmail}.`
+      : `Verification code: ${otp} (Email provider not configured on server)`;
+
     return NextResponse.json({
       data: {
         success: true,
-        message: `A 6-digit verification code has been sent to ${normalizedEmail}.`,
+        message,
         devOtp: emailResult.devOtp,
       },
     });
