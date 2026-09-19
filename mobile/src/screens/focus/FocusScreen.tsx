@@ -72,7 +72,8 @@ export const FocusScreen: React.FC = () => {
     const targetSession = sessionToComplete || activeSessionRef.current;
     audioHapticsService.playCompletionChime(settings?.soundEnabled ?? true);
     notificationService.notifySessionCompleted(
-      targetSession?.task?.title || selectedTask?.title || (selectedType === 'POMODORO' ? 'Focus Session' : 'Break')
+      targetSession?.task?.title || selectedTask?.title || (selectedType === 'POMODORO' ? 'Focus Session' : 'Break'),
+      settings?.soundEnabled ?? true
     );
 
     if (targetSession?.id) {
@@ -219,6 +220,7 @@ export const FocusScreen: React.FC = () => {
           sessionId: newSession.id,
           expectedEndTime,
           title: selectedTask?.title || (selectedType === 'POMODORO' ? 'Focus Session' : 'Break'),
+          soundEnabled: settings?.soundEnabled ?? true,
         });
       }
 
@@ -258,6 +260,7 @@ export const FocusScreen: React.FC = () => {
           sessionId: activeSession.id,
           expectedEndTime,
           title: activeSession.task?.title || selectedTask?.title || 'Focus Session',
+          soundEnabled: settings?.soundEnabled ?? true,
         });
       }
       return res;
@@ -271,7 +274,10 @@ export const FocusScreen: React.FC = () => {
     mutationFn: async () => {
       if (!activeSession?.id) return;
       audioHapticsService.playCompletionChime(settings?.soundEnabled ?? true);
-      notificationService.notifySessionCompleted(activeSession.task?.title || 'Focus Session');
+      notificationService.notifySessionCompleted(
+        activeSession.task?.title || 'Focus Session',
+        settings?.soundEnabled ?? true
+      );
       await notificationService.cancelSessionNotification(activeSession.id);
       return focusSessionsApi.completeSession(activeSession.id);
     },

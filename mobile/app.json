@@ -3,7 +3,7 @@
     "name": "FocusFlow",
     "slug": "focusflow",
     "scheme": "focusflow",
-    "version": "2.0.0",
+    "version": "2.1.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.focusflow.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "adaptiveIcon": {
         "backgroundColor": "#080E1A",
         "foregroundImage": "./assets/android-icon-foreground.png",
@@ -36,7 +36,7 @@
         {
           "icon": "./assets/icon.png",
           "color": "#6366F1",
-          "sounds": []
+          "sounds": ["./assets/sounds/focusflow_alarm.wav"]
         }
       ]
     ]

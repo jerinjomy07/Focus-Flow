@@ -1,40 +1,40 @@
-# FocusFlow v2.0.0 Production Release Notes
-**Release Date**: September 19, 2026
-**Target Platforms**: Android 7.0+ (API 24 to 36), Web (Next.js 16)
-**Build Engine**: Hermes Bytecode AOT / React Native 0.86.3
+# FocusFlow v2.1.0 Production Release Notes
+**Release Date**: September 20, 2026  
+**Target Platforms**: Android 7.0+ (API 24 to 36), Web (Next.js 16)  
+**Build Engine**: Hermes Bytecode AOT / React Native 0.86.3  
 
 ---
 
-## 🚀 Highlights & Major Features
+## 🚀 Highlights & New Features in v2.1.0
 
-### 1. Brand Identity & Holographic App Icon
-- Master high-definition holographic icon with orbital particle and deep cosmic gradients.
-- Updated Android adaptive launcher mipmap icons (`mipmap-{mdpi,hdpi,xhdpi,xxhdpi,xxxhdpi}`) and splash screens.
+### 1. Special Timer Completion Ringtone & Alarm Audio Pipeline
+- **Custom Resonant Tibetan Zen Bell Chime**: Synthesized 16-bit 44.1kHz stereo PCM audio asset (`focusflow_alarm.wav`) tuned to the 528Hz Solfeggio focus frequency with natural acoustic harmonic decay (C5, G5, C6, E6).
+- **Dedicated Android Alarm Notification Channel (`focusflow_timer_alarm_v2`)**: Configured with `USAGE_ALARM` and `CONTENT_TYPE_SONIFICATION` at `IMPORTANCE_MAX` with custom vibration pulse patterns (`[0, 500, 250, 500]`).
+- **Foreground & Background Parity**: The custom alarm tone rings reliably whether the application is active in the foreground, backgrounded, or when the device screen is locked.
+- **Preference-Aware**: Fully honors user sound toggles (`soundEnabled`) configured in Settings.
 
-### 2. Google Stitch UI Overhaul (Obsidian Kinetic & Terra)
-- **Obsidian Kinetic Mode**: Cosmic dark palette (`#080E1A`), luminous cyan telemetry accents (`#4CD7F6`), elevated glassmorphic cards.
-- **Terra Mode**: Warm earthen workspace palette (`#F8F6F0` and `#2D5A43`).
-- **SVG Morphing Theme Switcher**: Animated transition between celestial Moon and radiant Sun icons.
-- **Header Quick-Toggle**: Instant theme switch button across main navigation views.
+### 2. Server-Authoritative Timer & Background Reconciliation
+- Wall-clock monotonic timestamp reconciliation upon application foregrounding without network latency dependency.
+- Scheduled and canceled background notifications maintain complete idempotency across pause, resume, reset, and skip cycles.
 
-### 3. Editable Task Projects & Custom Presets
-- Dynamic tag filtering and real-time project indicators.
-- Interactive `+` Custom Preset Modal allowing pilots to create custom project categories on the fly.
+### 3. Custom Duration Intervals
+- Added `CUSTOM` calibration dialogs for Focus (1–120m), Short Break (1–60m), and Long Break (1–120m).
+- Preserves all standard presets (`25m`, `45m`, `50m` Focus; `5m`, `10m` Short; `15m`, `20m`, `30m` Long).
 
-### 4. Hardened 2-Stage Email OTP Password Reset
-- Cryptographic 6-digit verification code with 10-minute validity.
-- Direct integration with Resend transactional email API (`onboarding@resend.dev`).
-- Multi-stage credential recovery modal with automatic sign-in and session revocation.
-
-### 5. Architectural & Engine Optimizations
-- Universal release APK size: ~59.07 MB with ProGuard dead-code elimination.
-- Zero-drift monotonic wall-clock timer architecture.
-- Hardware-backed Android Keystore dual-token session security (`expo-secure-store`).
+### 4. Hardened Security & Password Reset Error Propagation
+- HTTP 502 error propagation on Resend email provider delivery failure with structured diagnostics.
+- Account enumeration protection with constant-time simulation and safe email masking in audit logs.
 
 ---
 
-## 📦 Checksums & Verification
-- **APK**: `FocusFlow-2.0.0-production.apk`
-- **SHA-256**: `9B920F1DAE475902D7D3ED5B8535DDDE62B52CDFDD381C291A59FE6672B23209`
-- **AAB**: `FocusFlow-2.0.0-production.aab`
-- **SHA-256**: `69AC9CAEC0787DABE06FFFA8CA3D8F464BA148375AA0CE1A6AAC4FD8DC8D8EE8`
+## 📦 Checksums & Verification (v2.1.0)
+- **APK**: `FocusFlow-2.1.0-production.apk`
+- **SHA-256**: `70E31FDE8FFBEA4D5964CDFD7085E53B66E5F375974D9E550D842929FC196DF8`
+- **AAB**: `FocusFlow-2.1.0-production.aab`
+- **SHA-256**: `29F5A579A02819851B224EAB36220E6FE3C64FC3806E954D9B5A4701884C1300`
+
+---
+
+## 📦 Historical Release Checksums (v2.0.0)
+- **APK**: `FocusFlow-2.0.0-production.apk` (`9B920F1DAE475902D7D3ED5B8535DDDE62B52CDFDD381C291A59FE6672B23209`)
+- **AAB**: `FocusFlow-2.0.0-production.aab` (`69AC9CAEC0787DABE06FFFA8CA3D8F464BA148375AA0CE1A6AAC4FD8DC8D8EE8`)

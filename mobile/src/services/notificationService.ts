@@ -8,7 +8,7 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 
-const CHANNEL_ID = 'focusflow_timer_channel';
+const CHANNEL_ID = 'focusflow_timer_alarm_v2';
 
 // Configure foreground notification presentation
 Notifications.setNotificationHandler({
@@ -32,11 +32,15 @@ export const notificationService = {
   init: async (): Promise<boolean> => {
     if (Platform.OS === 'android') {
       await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
-        name: 'Focus Session Notifications',
+        name: 'Focus Session Alarms',
         importance: Notifications.AndroidImportance.MAX,
-        vibrationPattern: [0, 250, 250, 250],
+        vibrationPattern: [0, 500, 250, 500],
         lightColor: '#6366F1',
-        sound: undefined, // Default system notification sound
+        sound: 'focusflow_alarm.wav',
+        audioAttributes: {
+          usage: Notifications.AndroidAudioUsage.ALARM,
+          contentType: Notifications.AndroidAudioContentType.SONIFICATION,
+        },
         enableVibrate: true,
         showBadge: true,
       });
@@ -61,6 +65,7 @@ export const notificationService = {
     sessionId: string;
     expectedEndTime: Date;
     title?: string;
+    soundEnabled?: boolean;
   }): Promise<string | null> => {
     try {
       const hasPermission = await notificationService.init();
@@ -71,6 +76,7 @@ export const notificationService = {
       await Notifications.cancelScheduledNotificationAsync(identifier).catch(() => {});
 
       const delaySeconds = Math.max(1, Math.round((params.expectedEndTime.getTime() - Date.now()) / 1000));
+      const shouldPlaySound = params.soundEnabled ?? true;
 
       await Notifications.scheduleNotificationAsync({
         identifier,
@@ -78,7 +84,7 @@ export const notificationService = {
           title: 'Focus Session Completed! 🎯',
           body: `Great focus! You completed your ${params.title || 'Focus Session'}. Time for a break.`,
           data: { sessionId: params.sessionId, type: 'FOCUS_SESSION_COMPLETED' },
-          sound: true,
+          sound: shouldPlaySound ? 'focusflow_alarm.wav' : false,
           priority: Notifications.AndroidNotificationPriority.MAX,
         },
         trigger: {
@@ -95,9 +101,12 @@ export const notificationService = {
   },
 
   /**
-   * Immediately delivers a notification indicating session completion
+   * Immediately delivers a notification indicating session completion with custom alarm sound
    */
-  notifySessionCompleted: async (title: string = 'Focus Session'): Promise<string | null> => {
+  notifySessionCompleted: async (
+    title: string = 'Focus Session',
+    soundEnabled: boolean = true
+  ): Promise<string | null> => {
     try {
       const hasPermission = await notificationService.init();
       if (!hasPermission) return null;
@@ -107,10 +116,12 @@ export const notificationService = {
           title: 'Focus Session Completed! 🎯',
           body: `Great focus! You completed your ${title}. Time for a break.`,
           data: { type: 'FOCUS_SESSION_COMPLETED' },
-          sound: true,
+          sound: soundEnabled ? 'focusflow_alarm.wav' : false,
           priority: Notifications.AndroidNotificationPriority.MAX,
         },
-        trigger: null, // Deliver immediately
+        trigger: {
+          channelId: CHANNEL_ID,
+        },
       });
 
       return identifier;

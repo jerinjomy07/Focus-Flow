@@ -7,8 +7,8 @@
 *Autonomous Kinetic Deep Work Ecosystem & Pure Standalone Android Application*
 
 <p align="center">
-  <a href="https://github.com/jerinjomy07/Focus-Flow/releases/latest"><img src="https://img.shields.io/badge/Release-v2.0.0-6366F1?style=for-the-badge&logo=github&logoColor=white" alt="Latest Release" /></a>
-  <a href="https://github.com/jerinjomy07/Focus-Flow/releases/latest/download/FocusFlow-2.0.0-production.apk"><img src="https://img.shields.io/badge/Download_APK-v2.0.0-10B981?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
+  <a href="https://github.com/jerinjomy07/Focus-Flow/releases/latest"><img src="https://img.shields.io/badge/Release-v2.1.0-6366F1?style=for-the-badge&logo=github&logoColor=white" alt="Latest Release" /></a>
+  <a href="https://github.com/jerinjomy07/Focus-Flow/releases/latest/download/FocusFlow-2.1.0-production.apk"><img src="https://img.shields.io/badge/Download_APK-v2.1.0-10B981?style=for-the-badge&logo=android&logoColor=white" alt="Download APK" /></a>
   <a href="https://focusflow-app-red-gamma.vercel.app"><img src="https://img.shields.io/badge/Vercel_Live-Production-000000?style=for-the-badge&logo=vercel&logoColor=white" alt="Live App" /></a>
   <a href="https://neon.tech"><img src="https://img.shields.io/badge/Neon_PostgreSQL-Serverless-00E599?style=for-the-badge&logo=postgresql&logoColor=white" alt="Neon Database" /></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/License-MIT-F59E0B?style=for-the-badge" alt="License: MIT" /></a>
@@ -25,7 +25,7 @@
 ## 📑 Table of Contents
 
 - [📱 Download & Installation](#-download--installation)
-- [🚀 What's New in v2.0.0](#-whats-new-in-v200)
+- [🚀 What's New in v2.1.0](#-whats-new-in-v210)
 - [📸 Screenshots Showcase](#-screenshots-showcase)
 - [⚡ Key Highlights & Engineering](#-key-highlights--engineering)
 - [🏗️ System Architecture & Data Flow](#️-system-architecture--data-flow)
@@ -41,8 +41,8 @@ You can download and install the production-ready standalone Android APK directl
 
 | Package | Version | Download Link | Build Architecture | Size |
 | :--- | :---: | :--- | :---: | :---: |
-| 🤖 **FocusFlow Release APK** | `v2.0.0` | [**Download FocusFlow-2.0.0-production.apk**](https://github.com/jerinjomy07/Focus-Flow/releases/latest/download/FocusFlow-2.0.0-production.apk) | Universal (arm64-v8a, armeabi-v7a, x86_64) | ~68 MB |
-| 📦 **Google Play Bundle** | `v2.0.0` | [**Download FocusFlow-2.0.0-production.aab**](https://github.com/jerinjomy07/Focus-Flow/releases/latest/download/FocusFlow-2.0.0-production.aab) | Android App Bundle (AAB) | ~47 MB |
+| 🤖 **FocusFlow Release APK** | `v2.1.0` | [**Download FocusFlow-2.1.0-production.apk**](https://github.com/jerinjomy07/Focus-Flow/releases/latest/download/FocusFlow-2.1.0-production.apk) | Universal (arm64-v8a, armeabi-v7a, x86_64) | ~59 MB |
+| 📦 **Google Play Bundle** | `v2.1.0` | [**Download FocusFlow-2.1.0-production.aab**](https://github.com/jerinjomy07/Focus-Flow/releases/latest/download/FocusFlow-2.1.0-production.aab) | Android App Bundle (AAB) | ~41 MB |
 | 🏷️ **GitHub Releases** | All | [**Browse Release Tags & Checksums**](https://github.com/jerinjomy07/Focus-Flow/releases) | Release Notes, Hashes & Assets | — |
 
 > 💡 **Installation Tip**: After downloading the `.apk` on your mobile phone, tap the file and select *"Install from unknown sources"* if prompted. The application connects directly to the live cloud backend over 5G/4G/Wi-Fi with zero USB or PC connection required.
@@ -59,7 +59,24 @@ FocusFlow operates a seamless cross-platform cloud experience deployed on **Verc
 
 ---
 
-## 🚀 What's New in v2.0.0
+## 🚀 What's New in v2.1.0
+
+The **v2.1.0 Release** introduces a custom focus completion chime and alarm audio pipeline, zero-drift wall-clock background timer synchronization, custom session duration calibration, and hardened security diagnostics:
+
+### 🔔 1. Special Timer Completion Ringtone & Alarm Pipeline
+* **528Hz Zen Bell Chime**: Hand-crafted 16-bit 44.1kHz audio asset (`focusflow_alarm.wav`) tuned to the transformation Solfeggio frequency with rich harmonic acoustic decay (C5, G5, C6, E6).
+* **Dedicated Android Alarm Notification Channel (`focusflow_timer_alarm_v2`)**: Configured at `IMPORTANCE_MAX` with `USAGE_ALARM` and tactile vibration sequencing (`[0, 500, 250, 500]`).
+* **Foreground & Background Parity**: Sound plays reliably when the session finishes, whether in active view, backgrounded, or under screen lock. Respects `soundEnabled` user setting.
+
+### ⏱️ 2. Zero-Drift Server-Authoritative Background Timer
+* Instantaneous monotonic wall-clock reconciliation on foreground resumption without network refetch latency.
+* Full idempotency across pause, resume, reset, and skip cycles.
+
+### 🎛️ 3. Flexible Custom Duration Calibration
+* Added dedicated `CUSTOM` duration inputs in Settings for Focus (1–120m), Short Break (1–60m), and Long Break (1–120m) while preserving standard preset intervals.
+
+### 🛡️ 4. Hardened Password Reset Error Propagation
+* HTTP 502 Bad Gateway with diagnostic payloads on Resend email delivery failure while preserving account enumeration protection.
 
 The **v2.0.0 Major Release** delivers a futuristic aesthetic redesign, dynamic SVG theme animations, editable task project presets, hardened email OTP verification, and a refreshed visual brand identity.
 
@@ -202,7 +219,7 @@ FocusFlow/
 │   │   ├── app/                        # App router (pages, drawers, & API routes)
 │   │   ├── lib/email.ts                # Resend OTP transactional mail service
 │   │   └── lib/auth/                   # Dedicated mobile & web session handlers
-│   └── package.json                    # v2.0.0
+│   └── package.json                    # v2.1.0
 ├── mobile/                             # Pure Standalone React Native + Expo App
 │   ├── android/                        # Android native project (Gradle / ProGuard)
 │   │   └── app/src/main/res/           # Native mipmap launcher icons & colors
@@ -212,8 +229,8 @@ FocusFlow/
 │   │   ├── context/                    # AuthContext & ThemeContext
 │   │   ├── screens/                    # Stitch Dashboard, Focus, Tasks, History, Settings
 │   │   └── services/                   # Drift-free timer & harmonic audio chimes
-│   ├── app.json                        # Application manifest (v2.0.0, versionCode 2)
-│   └── package.json                    # v2.0.0
+│   ├── app.json                        # Application manifest (v2.1.0, versionCode 3)
+│   └── package.json                    # v2.1.0
 ├── release/                            # Distribution binaries & checksums
 └── README.md                           # Modern project showcase
 ```
@@ -243,7 +260,7 @@ npm run dev
 ```
 Open [http://localhost:3000](http://localhost:3000) to view the web dashboard.
 
-### 2. Mobile Application Build (Release APK v2.0.0)
+### 2. Mobile Application Build (Release APK v2.1.0)
 ```bash
 cd mobile
 npm install
