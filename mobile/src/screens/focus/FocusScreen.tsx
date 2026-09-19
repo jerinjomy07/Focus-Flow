@@ -5,7 +5,7 @@
 // - Dark: mobile/design/stitch_focusflow_futuristic_redesign/focus_timer_signature/
 // - Light: mobile/design/stitch_focusflow_futuristic_redesign/focus_timer_terra_design/
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   View,
   Text,
@@ -21,7 +21,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { focusSessionsApi } from '../../api/focusSessions';
 import { tasksApi } from '../../api/tasks';
 import { settingsApi } from '../../api/settings';
-import { Task, SessionType } from '../../types';
+import { Task, SessionType, FocusSession } from '../../types';
 import { useTheme } from '../../context/ThemeContext';
 import {
   reconcileSessionTimer,
@@ -63,20 +63,57 @@ export const FocusScreen: React.FC = () => {
     refetchInterval: 10000,
   });
 
-  // 3. Fetch user tasks for session attachment
-  const { data: tasks = [] } = useQuery({
-    queryKey: ['tasks', 'TODO'],
-    queryFn: () => tasksApi.getTasks({ status: 'TODO' }),
-  });
+  // Keep a stable ref to activeSession for background/ticker reconciliation
+  const activeSessionRef = useRef<FocusSession | null>(activeSession || null);
+  activeSessionRef.current = activeSession || null;
 
-  // Sync display state whenever activeSession changes
-  useEffect(() => {
-    if (activeSession) {
-      const reconciled = reconcileSessionTimer(activeSession);
+  // Natural completion handler
+  const handleNaturalCompletion = useCallback(async (sessionToComplete?: FocusSession | null) => {
+    const targetSession = sessionToComplete || activeSessionRef.current;
+    audioHapticsService.playCompletionChime(settings?.soundEnabled ?? true);
+    notificationService.notifySessionCompleted(
+      targetSession?.task?.title || selectedTask?.title || (selectedType === 'POMODORO' ? 'Focus Session' : 'Break')
+    );
+
+    if (targetSession?.id) {
+      try {
+        await focusSessionsApi.completeSession(targetSession.id);
+        await notificationService.cancelSessionNotification(targetSession.id);
+        queryClient.invalidateQueries({ queryKey: ['activeFocusSession'] });
+        queryClient.invalidateQueries({ queryKey: ['productivitySummary'] });
+        queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      } catch {
+        // Handled silently
+      }
+    }
+  }, [settings, selectedTask, selectedType, queryClient]);
+
+  // Synchronous wall-clock timer reconciler
+  const reconcileTimer = useCallback((session?: FocusSession | null) => {
+    const currentSession = session !== undefined ? session : activeSessionRef.current;
+    if (currentSession) {
+      const reconciled = reconcileSessionTimer(currentSession);
       setDisplayState(reconciled);
-      setSelectedType(activeSession.type);
+      const normalizedType: SessionType =
+        (currentSession.type as string) === 'FOCUS' ? 'POMODORO' : currentSession.type;
+      setSelectedType(normalizedType);
+
+      // If session completed while backgrounded or sleeping, auto-complete
+      if (
+        reconciled.status === 'COMPLETED' &&
+        (currentSession.status === 'ACTIVE' || (currentSession.status as string) === 'IN_PROGRESS')
+      ) {
+        handleNaturalCompletion(currentSession);
+      }
     } else {
-      const defaultDuration = (settings?.focusDurationMinutes || 25) * 60;
+      const isPomodoro = selectedType === 'POMODORO' || (selectedType as string) === 'FOCUS';
+      const targetDurationMinutes =
+        isPomodoro
+          ? settings?.focusDurationMinutes || 25
+          : selectedType === 'SHORT_BREAK'
+          ? settings?.shortBreakMinutes || 5
+          : settings?.longBreakMinutes || 15;
+      const defaultDuration = targetDurationMinutes * 60;
       setDisplayState({
         status: 'IDLE',
         remainingSeconds: defaultDuration,
@@ -85,68 +122,77 @@ export const FocusScreen: React.FC = () => {
         progressPercent: 0,
       });
     }
-  }, [activeSession, settings]);
+  }, [selectedType, settings, handleNaturalCompletion]);
 
-  // Foreground lifecycle listener
+  // Sync display state whenever activeSession or settings change
+  useEffect(() => {
+    reconcimerSync();
+    function reconcimerSync() {
+      reconcileTimer(activeSession);
+    }
+  }, [activeSession, settings, selectedType, reconcileTimer]);
+
+  // Immediate Foreground lifecycle listener — instantly recalculates without waiting for network
   useEffect(() => {
     const unsubscribe = subscribeToForegroundResume(() => {
+      // 1. Instantly calculate wall-clock elapsed & remaining time from existing session ref
+      reconcileTimer();
+      // 2. Also trigger query invalidation to reconcile with any server changes
       queryClient.invalidateQueries({ queryKey: ['activeFocusSession'] });
     });
     return unsubscribe;
-  }, [queryClient]);
+  }, [reconcileTimer, queryClient]);
 
-  // Foreground 1-second countdown ticker
+  // Foreground countdown ticker — derives from authoritative session timestamps
   useEffect(() => {
     if (displayState.status !== 'RUNNING') return;
 
     const interval = setInterval(() => {
-      setDisplayState((prev) => {
-        if (prev.remainingSeconds <= 1) {
+      if (activeSessionRef.current && (activeSessionRef.current.status === 'ACTIVE' || (activeSessionRef.current.status as string) === 'IN_PROGRESS')) {
+        const reconciled = reconcileSessionTimer(activeSessionRef.current);
+        setDisplayState(reconciled);
+        if (reconciled.remainingSeconds <= 0) {
           clearInterval(interval);
-          handleNaturalCompletion();
+          handleNaturalCompletion(activeSessionRef.current);
+        }
+      } else {
+        // Fallback local decrement if no active session
+        setDisplayState((prev) => {
+          if (prev.remainingSeconds <= 1) {
+            clearInterval(interval);
+            handleNaturalCompletion();
+            return {
+              ...prev,
+              status: 'COMPLETED',
+              remainingSeconds: 0,
+              progressPercent: 100,
+            };
+          }
+          const remainingSeconds = prev.remainingSeconds - 1;
+          const elapsedSeconds = prev.elapsedSeconds + 1;
+          const progressPercent =
+            prev.totalDurationSeconds > 0
+              ? (elapsedSeconds / prev.totalDurationSeconds) * 100
+              : 0;
+
           return {
             ...prev,
-            status: 'COMPLETED',
-            remainingSeconds: 0,
-            progressPercent: 100,
+            remainingSeconds,
+            elapsedSeconds,
+            progressPercent,
           };
-        }
-        const remainingSeconds = prev.remainingSeconds - 1;
-        const elapsedSeconds = prev.elapsedSeconds + 1;
-        const progressPercent =
-          prev.totalDurationSeconds > 0
-            ? (elapsedSeconds / prev.totalDurationSeconds) * 100
-            : 0;
-
-        return {
-          ...prev,
-          remainingSeconds,
-          elapsedSeconds,
-          progressPercent,
-        };
-      });
+        });
+      }
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [displayState.status]);
+  }, [displayState.status, handleNaturalCompletion]);
 
-  // Natural completion handler
-  const handleNaturalCompletion = async () => {
-    audioHapticsService.playCompletionChime(settings?.soundEnabled ?? true);
-    notificationService.notifySessionCompleted(
-      selectedTask?.title || (selectedType === 'POMODORO' ? 'Focus Session' : 'Break')
-    );
-
-    if (activeSession?.id) {
-      try {
-        await focusSessionsApi.completeSession(activeSession.id);
-        queryClient.invalidateQueries({ queryKey: ['activeFocusSession'] });
-        queryClient.invalidateQueries({ queryKey: ['productivitySummary'] });
-      } catch {
-        // Handled silently
-      }
-    }
-  };
+  // 3. Fetch user tasks for session attachment
+  const { data: tasks = [] } = useQuery({
+    queryKey: ['tasks', 'TODO'],
+    queryFn: () => tasksApi.getTasks({ status: 'TODO' }),
+  });
 
   // Mutations
   const startMutation = useMutation({
@@ -159,12 +205,24 @@ export const FocusScreen: React.FC = () => {
           ? settings?.shortBreakMinutes || 5
           : settings?.longBreakMinutes || 15;
 
-      return focusSessionsApi.startSession({
+      const newSession = await focusSessionsApi.startSession({
         type: selectedType,
         targetDurationMinutes: targetMins,
         taskId: selectedTask?.id,
         projectId: selectedTask?.projectId || undefined,
       });
+
+      // Schedule native notification for background completion
+      if (newSession?.id) {
+        const expectedEndTime = new Date(Date.now() + targetMins * 60 * 1000);
+        await notificationService.scheduleSessionNotification({
+          sessionId: newSession.id,
+          expectedEndTime,
+          title: selectedTask?.title || (selectedType === 'POMODORO' ? 'Focus Session' : 'Break'),
+        });
+      }
+
+      return newSession;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activeFocusSession'] });
@@ -178,6 +236,8 @@ export const FocusScreen: React.FC = () => {
     mutationFn: async () => {
       if (!activeSession?.id) return;
       audioHapticsService.hapticPauseResume();
+      // Cancel scheduled notification while paused
+      await notificationService.cancelSessionNotification(activeSession.id);
       return focusSessionsApi.pauseSession(activeSession.id);
     },
     onSuccess: () => {
@@ -189,7 +249,18 @@ export const FocusScreen: React.FC = () => {
     mutationFn: async () => {
       if (!activeSession?.id) return;
       audioHapticsService.hapticPauseResume();
-      return focusSessionsApi.resumeSession(activeSession.id);
+      const res = await focusSessionsApi.resumeSession(activeSession.id);
+      // Reschedule notification for new expected end time
+      const current = reconcileSessionTimer(activeSession);
+      if (current.remainingSeconds > 0) {
+        const expectedEndTime = new Date(Date.now() + current.remainingSeconds * 1000);
+        await notificationService.scheduleSessionNotification({
+          sessionId: activeSession.id,
+          expectedEndTime,
+          title: activeSession.task?.title || selectedTask?.title || 'Focus Session',
+        });
+      }
+      return res;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['activeFocusSession'] });
@@ -201,6 +272,7 @@ export const FocusScreen: React.FC = () => {
       if (!activeSession?.id) return;
       audioHapticsService.playCompletionChime(settings?.soundEnabled ?? true);
       notificationService.notifySessionCompleted(activeSession.task?.title || 'Focus Session');
+      await notificationService.cancelSessionNotification(activeSession.id);
       return focusSessionsApi.completeSession(activeSession.id);
     },
     onSuccess: () => {
@@ -214,6 +286,7 @@ export const FocusScreen: React.FC = () => {
     mutationFn: async () => {
       if (!activeSession?.id) return;
       audioHapticsService.hapticPauseResume();
+      await notificationService.cancelSessionNotification(activeSession.id);
       return focusSessionsApi.resetSession(activeSession.id);
     },
     onSuccess: () => {

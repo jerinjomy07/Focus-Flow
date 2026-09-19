@@ -1,11 +1,21 @@
-// src/lib/email.ts
-// FocusFlow — Transactional Email & Security OTP Dispatcher
+import { logger } from './logger';
 
 export interface SendEmailResult {
   success: boolean;
   messageId?: string;
   devOtp?: string;
   error?: string;
+  statusCode?: number;
+}
+
+/** Safely masks an email for structured logging, e.g. "al***@domain.com" */
+function maskEmail(email: string): string {
+  const parts = email.split('@');
+  if (parts.length !== 2) return '***';
+  const name = parts[0];
+  const domain = parts[1];
+  const maskedName = name.length <= 2 ? `${name[0]}*` : `${name.slice(0, 2)}***`;
+  return `${maskedName}@${domain}`;
 }
 
 export async function sendPasswordResetOtpEmail(
@@ -14,6 +24,7 @@ export async function sendPasswordResetOtpEmail(
 ): Promise<SendEmailResult> {
   const resendApiKey = process.env.RESEND_API_KEY;
   const fromEmail = process.env.EMAIL_FROM || 'FocusFlow <onboarding@resend.dev>';
+  const maskedRecipient = maskEmail(toEmail);
 
   const subject = `FocusFlow Security: Your Verification Code is ${otp}`;
   const htmlContent = `
@@ -76,28 +87,39 @@ export async function sendPasswordResetOtpEmail(
 
       if (!res.ok) {
         const errJson = await res.json().catch(() => ({}));
-        console.error('[EMAIL] Resend delivery error:', errJson);
-        return { success: false, error: errJson.message || 'Email delivery failed' };
+        const statusMessage = typeof errJson?.message === 'string' ? errJson.message : 'Email delivery rejected by provider';
+        logger.error(
+          { recipient: maskedRecipient, statusCode: res.status, providerMessage: statusMessage },
+          '[EMAIL] Transactional OTP delivery rejected by provider'
+        );
+        return {
+          success: false,
+          statusCode: res.status,
+          error: statusMessage,
+        };
       }
 
-      const json = await res.json();
-      console.log(`[EMAIL] Password reset OTP sent to ${toEmail} via Resend. ID: ${json.id}`);
-      return { success: true, messageId: json.id };
+      const json = await res.json().catch(() => ({}));
+      logger.info(
+        { recipient: maskedRecipient, messageId: json?.id },
+        '[EMAIL] Transactional password reset OTP dispatched successfully'
+      );
+      return { success: true, messageId: json?.id };
     } catch (err: unknown) {
       const errorMessage = err instanceof Error ? err.message : 'Network error delivering email';
-      console.error('[EMAIL] Failed to dispatch via Resend:', err);
+      logger.error(
+        { recipient: maskedRecipient, error: errorMessage },
+        '[EMAIL] Failed to dispatch via Resend REST API'
+      );
       return { success: false, error: errorMessage };
     }
   }
 
-  // 2. Fallback / Dev mode: Log cleanly to console and provide devOtp for instant testing
-  console.log(`\n==================================================`);
-  console.log(`[EMAIL DISPATCHER (DEV/TEST/NO-API-KEY)]`);
-  console.log(`To: ${toEmail}`);
-  console.log(`OTP Code: ${otp}`);
-  console.log(`Expires in: 10 minutes`);
-  console.log(`Tip: Set RESEND_API_KEY environment variable in Vercel for real inbox delivery.`);
-  console.log(`==================================================\n`);
+  // 2. Fallback / Dev mode: Log cleanly to console (masked) and provide devOtp for instant testing
+  logger.info(
+    { recipient: maskedRecipient },
+    '[EMAIL] Dispatcher running in dev/test fallback mode'
+  );
 
   return {
     success: true,

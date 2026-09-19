@@ -82,6 +82,7 @@ export const notificationService = {
           priority: Notifications.AndroidNotificationPriority.MAX,
         },
         trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.TIME_INTERVAL,
           seconds: delaySeconds,
           channelId: CHANNEL_ID,
         },

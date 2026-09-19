@@ -150,19 +150,52 @@ describe('Validation Schemas — StartSessionSchema', () => {
 });
 
 describe('Validation Schemas — UpdateSettingsSchema', () => {
-  it('accepts valid timer durations', () => {
-    const result = UpdateSettingsSchema.safeParse({
-      focusDuration: 30,
-      shortBreakDuration: 5,
-      longBreakDuration: 20,
-      theme: 'DARK',
-    });
-    expect(result.success).toBe(true);
+  it('accepts valid preset and custom focus durations (1–120 min)', () => {
+    expect(UpdateSettingsSchema.safeParse({ focusDuration: 25 }).success).toBe(true); // Preset
+    expect(UpdateSettingsSchema.safeParse({ focusDuration: 45 }).success).toBe(true); // Preset
+    expect(UpdateSettingsSchema.safeParse({ focusDuration: 50 }).success).toBe(true); // Preset
+    expect(UpdateSettingsSchema.safeParse({ focusDuration: 1 }).success).toBe(true);  // Custom minimum boundary
+    expect(UpdateSettingsSchema.safeParse({ focusDuration: 35 }).success).toBe(true); // Custom intermediate
+    expect(UpdateSettingsSchema.safeParse({ focusDuration: 120 }).success).toBe(true); // Custom maximum boundary
   });
 
-  it('rejects focus duration < 1 or > 120 minutes', () => {
+  it('rejects invalid focus durations (<= 0, > 120, decimals, non-numbers)', () => {
     expect(UpdateSettingsSchema.safeParse({ focusDuration: 0 }).success).toBe(false);
-    expect(UpdateSettingsSchema.safeParse({ focusDuration: 130 }).success).toBe(false);
+    expect(UpdateSettingsSchema.safeParse({ focusDuration: -5 }).success).toBe(false);
+    expect(UpdateSettingsSchema.safeParse({ focusDuration: 121 }).success).toBe(false);
+    expect(UpdateSettingsSchema.safeParse({ focusDuration: 25.5 }).success).toBe(false);
+    expect(UpdateSettingsSchema.safeParse({ focusDuration: '30' as unknown }).success).toBe(false);
+  });
+
+  it('accepts valid preset and custom short break durations (1–60 min)', () => {
+    expect(UpdateSettingsSchema.safeParse({ shortBreakDuration: 5 }).success).toBe(true);  // Preset
+    expect(UpdateSettingsSchema.safeParse({ shortBreakDuration: 10 }).success).toBe(true); // Preset
+    expect(UpdateSettingsSchema.safeParse({ shortBreakDuration: 1 }).success).toBe(true);  // Custom minimum
+    expect(UpdateSettingsSchema.safeParse({ shortBreakDuration: 7 }).success).toBe(true);  // Custom intermediate
+    expect(UpdateSettingsSchema.safeParse({ shortBreakDuration: 60 }).success).toBe(true); // Custom maximum
+  });
+
+  it('rejects invalid short break durations (<= 0, > 60, decimals, non-numbers)', () => {
+    expect(UpdateSettingsSchema.safeParse({ shortBreakDuration: 0 }).success).toBe(false);
+    expect(UpdateSettingsSchema.safeParse({ shortBreakDuration: -1 }).success).toBe(false);
+    expect(UpdateSettingsSchema.safeParse({ shortBreakDuration: 61 }).success).toBe(false);
+    expect(UpdateSettingsSchema.safeParse({ shortBreakDuration: 5.5 }).success).toBe(false);
+  });
+
+  it('accepts valid preset and custom long break durations (1–120 min)', () => {
+    expect(UpdateSettingsSchema.safeParse({ longBreakDuration: 15 }).success).toBe(true); // Preset
+    expect(UpdateSettingsSchema.safeParse({ longBreakDuration: 20 }).success).toBe(true); // Preset
+    expect(UpdateSettingsSchema.safeParse({ longBreakDuration: 30 }).success).toBe(true); // Preset
+    expect(UpdateSettingsSchema.safeParse({ longBreakDuration: 1 }).success).toBe(true);  // Custom minimum
+    expect(UpdateSettingsSchema.safeParse({ longBreakDuration: 40 }).success).toBe(true); // Custom intermediate
+    expect(UpdateSettingsSchema.safeParse({ longBreakDuration: 120 }).success).toBe(true); // Custom maximum
+  });
+
+  it('rejects invalid long break durations (<= 0, > 120, decimals, non-numbers)', () => {
+    expect(UpdateSettingsSchema.safeParse({ longBreakDuration: 0 }).success).toBe(false);
+    expect(UpdateSettingsSchema.safeParse({ longBreakDuration: -10 }).success).toBe(false);
+    expect(UpdateSettingsSchema.safeParse({ longBreakDuration: 121 }).success).toBe(false);
+    expect(UpdateSettingsSchema.safeParse({ longBreakDuration: 15.2 }).success).toBe(false);
   });
 
   it('rejects invalid theme values', () => {

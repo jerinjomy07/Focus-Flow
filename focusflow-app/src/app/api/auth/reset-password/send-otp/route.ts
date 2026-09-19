@@ -67,15 +67,13 @@ export async function POST(req: Request) {
     // Verify account exists
     const user = await db.getUserByEmail(normalizedEmail);
     if (!user) {
-      return NextResponse.json(
-        {
-          error: {
-            code: 'USER_NOT_FOUND',
-            message: 'No FocusFlow account exists with this email address.',
-          },
+      // Return uniform success message to protect against account enumeration
+      return NextResponse.json({
+        data: {
+          success: true,
+          message: `If an account with this email address exists, a 6-digit verification code has been dispatched.`,
         },
-        { status: 404 }
-      );
+      });
     }
 
     // Generate cryptographically secure 6-digit OTP
@@ -99,15 +97,34 @@ export async function POST(req: Request) {
     // Dispatch email
     const emailResult = await sendPasswordResetOtpEmail(normalizedEmail, otp);
 
-    const isEmailConfigured = Boolean(process.env.RESEND_API_KEY);
-    const message = isEmailConfigured
-      ? `A 6-digit verification code has been sent to ${normalizedEmail}.`
-      : `Verification code: ${otp} (Email provider not configured on server)`;
+    // If email delivery explicitly failed, never swallow the error silently
+    if (!emailResult.success) {
+      // In development or test environments, allow devOtp fallback for local tests
+      if (process.env.NODE_ENV === 'test' || process.env.NODE_ENV === 'development' || !process.env.RESEND_API_KEY) {
+        return NextResponse.json({
+          data: {
+            success: true,
+            message: `Verification code generated (fallback mode).`,
+            devOtp: emailResult.devOtp || otp,
+          },
+        });
+      }
+
+      return NextResponse.json(
+        {
+          error: {
+            code: 'EMAIL_DELIVERY_FAILED',
+            message: emailResult.error || 'Failed to deliver verification code email. Please contact support.',
+          },
+        },
+        { status: 502 }
+      );
+    }
 
     return NextResponse.json({
       data: {
         success: true,
-        message,
+        message: `A 6-digit verification code has been sent to ${normalizedEmail}.`,
         devOtp: emailResult.devOtp,
       },
     });
