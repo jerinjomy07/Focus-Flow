@@ -83,9 +83,10 @@ export async function sendPasswordResetOtpEmail(
       const json = await res.json();
       console.log(`[EMAIL] Password reset OTP sent to ${toEmail} via Resend. ID: ${json.id}`);
       return { success: true, messageId: json.id };
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const errorMessage = err instanceof Error ? err.message : 'Network error delivering email';
       console.error('[EMAIL] Failed to dispatch via Resend:', err);
-      return { success: false, error: err.message || 'Network error delivering email' };
+      return { success: false, error: errorMessage };
     }
   }
 
