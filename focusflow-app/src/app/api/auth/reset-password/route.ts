@@ -1,5 +1,5 @@
 // src/app/api/auth/reset-password/route.ts
-// FocusFlow — User Password Reset Route Handler
+// FocusFlow — User Password Reset with Verified OTP Route Handler
 
 import { NextResponse } from 'next/server';
 import bcrypt from 'bcryptjs';
@@ -17,7 +17,12 @@ export async function POST(req: Request) {
   const rateLimit = await authLimiter.check(key);
   if (!rateLimit.allowed) {
     return NextResponse.json(
-      { error: { code: 'RATE_LIMITED', message: 'Too many password reset requests. Please wait a moment and try again.' } },
+      {
+        error: {
+          code: 'RATE_LIMITED',
+          message: 'Too many password reset attempts. Please wait a moment and try again.',
+        },
+      },
       {
         status: 429,
         headers: {
@@ -38,7 +43,7 @@ export async function POST(req: Request) {
       );
     }
 
-    // Validate request schema
+    // Validate request schema (strictly requires email, 6-digit otp, and newPassword)
     const parsed = ResetPasswordSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
@@ -56,10 +61,10 @@ export async function POST(req: Request) {
       );
     }
 
-    const { email, newPassword } = parsed.data;
+    const { email, otp, newPassword } = parsed.data;
     const normalizedEmail = email.toLowerCase().trim();
 
-    // Look up user by email
+    // 1. Look up user by email
     const user = await db.getUserByEmail(normalizedEmail);
     if (!user) {
       return NextResponse.json(
@@ -73,17 +78,57 @@ export async function POST(req: Request) {
       );
     }
 
-    // Hash new password using bcrypt with cost factor 12
+    // 2. Validate OTP against VerificationToken table
+    const tokenRecord = await prisma.verificationToken.findFirst({
+      where: {
+        identifier: normalizedEmail,
+        token: otp.trim(),
+      },
+    });
+
+    if (!tokenRecord) {
+      return NextResponse.json(
+        {
+          error: {
+            code: 'INVALID_OTP',
+            message: 'Invalid verification code. Please check your email and enter the correct code.',
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    if (tokenRecord.expires < new Date()) {
+      await prisma.verificationToken.deleteMany({
+        where: { identifier: normalizedEmail },
+      });
+      return NextResponse.json(
+        {
+          error: {
+            code: 'EXPIRED_OTP',
+            message: 'This verification code has expired. Please request a new code.',
+          },
+        },
+        { status: 400 }
+      );
+    }
+
+    // 3. Hash new password using bcrypt with cost factor 12
     const salt = await bcrypt.genSalt(12);
     const passwordHash = await bcrypt.hash(newPassword, salt);
 
-    // Update password hash atomically
+    // 4. Update password hash atomically
     await prisma.user.update({
       where: { id: user.id },
       data: { passwordHash },
     });
 
-    // Revoke any existing mobile sessions for security
+    // 5. Consume and delete the verification token so it cannot be reused
+    await prisma.verificationToken.deleteMany({
+      where: { identifier: normalizedEmail },
+    });
+
+    // 6. Revoke any existing mobile sessions for security
     await prisma.mobileSession.updateMany({
       where: { userId: user.id, revokedAt: null },
       data: { revokedAt: new Date() },

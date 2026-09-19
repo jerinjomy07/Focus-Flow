@@ -27,16 +27,56 @@ function LoginForm() {
   // Forgot / Reset Password state
   const [isResetOpen, setIsResetOpen] = React.useState(false);
   const [resetEmail, setResetEmail] = React.useState('');
+  const [otp, setOtp] = React.useState('');
+  const [otpSent, setOtpSent] = React.useState(false);
   const [newPassword, setNewPassword] = React.useState('');
   const [confirmPassword, setConfirmPassword] = React.useState('');
   const [resetError, setResetError] = React.useState<string | null>(null);
   const [resetSuccess, setResetSuccess] = React.useState<string | null>(null);
+  const [isSendingOtp, setIsSendingOtp] = React.useState(false);
   const [isResetting, setIsResetting] = React.useState(false);
 
-  const handleResetPassword = async (e: React.FormEvent) => {
+  const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resetEmail.trim()) {
       setResetError('Please enter your account email address.');
+      return;
+    }
+
+    setResetError(null);
+    setResetSuccess(null);
+    setIsSendingOtp(true);
+
+    try {
+      const res = await fetch('/api/auth/reset-password/send-otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: resetEmail.trim() }),
+      });
+      const data = await res.json();
+
+      if (!res.ok) {
+        setResetError(data.error?.message || 'Failed to send verification code.');
+        setIsSendingOtp(false);
+        return;
+      }
+
+      setOtpSent(true);
+      setResetSuccess(data.data?.message || 'Verification code sent! Please check your email.');
+      if (data.data?.devOtp) {
+        setOtp(data.data.devOtp);
+      }
+    } catch {
+      setResetError('Failed to connect to authentication server.');
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleResetPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!otp.trim() || otp.trim().length !== 6) {
+      setResetError('Please enter the 6-digit verification code sent to your email.');
       return;
     }
     if (!newPassword || newPassword.length < 8) {
@@ -56,7 +96,11 @@ function LoginForm() {
       const res = await fetch('/api/auth/reset-password', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: resetEmail.trim(), newPassword }),
+        body: JSON.stringify({
+          email: resetEmail.trim(),
+          otp: otp.trim(),
+          newPassword,
+        }),
       });
       const data = await res.json();
 
@@ -129,91 +173,180 @@ function LoginForm() {
   return (
     <Card>
       {isResetOpen ? (
-        <form onSubmit={handleResetPassword}>
-          <CardContent className="space-y-4 pt-6">
-            <div>
-              <h2 className="text-lg font-bold text-foreground">Reset Password</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Enter your registered email address and choose a new password.
-              </p>
-            </div>
-
-            {resetError && (
-              <Alert variant="destructive">
-                <AlertDescription>{resetError}</AlertDescription>
-              </Alert>
-            )}
-
-            {resetSuccess && (
-              <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
-                {resetSuccess}
+        !otpSent ? (
+          <form onSubmit={handleSendOtp}>
+            <CardContent className="space-y-4 pt-6">
+              <div>
+                <h2 className="text-lg font-bold text-foreground">Reset Password</h2>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Enter your account email. We will send a secure 6-digit verification code to verify your identity.
+                </p>
               </div>
-            )}
 
-            <div className="space-y-1.5">
-              <label htmlFor="reset-email" className="text-xs font-medium text-foreground">
-                Account Email
-              </label>
-              <Input
-                id="reset-email"
-                type="email"
-                placeholder="name@example.com"
-                required
-                value={resetEmail}
-                onChange={(e) => setResetEmail(e.target.value)}
-                disabled={isResetting}
-              />
-            </div>
+              {resetError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{resetError}</AlertDescription>
+                </Alert>
+              )}
 
-            <div className="space-y-1.5">
-              <label htmlFor="reset-new-password" className="text-xs font-medium text-foreground">
-                New Password (min 8 chars)
-              </label>
-              <Input
-                id="reset-new-password"
-                type="password"
-                placeholder="••••••••"
-                required
-                value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
-                disabled={isResetting}
-              />
-            </div>
+              {resetSuccess && (
+                <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+                  {resetSuccess}
+                </div>
+              )}
 
-            <div className="space-y-1.5">
-              <label htmlFor="reset-confirm-password" className="text-xs font-medium text-foreground">
-                Confirm New Password
-              </label>
-              <Input
-                id="reset-confirm-password"
-                type="password"
-                placeholder="••••••••"
-                required
-                value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                disabled={isResetting}
-              />
-            </div>
-          </CardContent>
+              <div className="space-y-1.5">
+                <label htmlFor="reset-email" className="text-xs font-medium text-foreground">
+                  Account Email
+                </label>
+                <Input
+                  id="reset-email"
+                  type="email"
+                  placeholder="name@example.com"
+                  required
+                  value={resetEmail}
+                  onChange={(e) => setResetEmail(e.target.value)}
+                  disabled={isSendingOtp}
+                />
+              </div>
+            </CardContent>
 
-          <CardFooter className="flex flex-col space-y-3 pt-2">
-            <Button
-              type="submit"
-              className="w-full font-semibold shadow-xs"
-              isLoading={isResetting}
-            >
-              Reset Password & Sign In
-            </Button>
+            <CardFooter className="flex flex-col space-y-3 pt-2">
+              <Button
+                type="submit"
+                className="w-full font-semibold shadow-xs"
+                isLoading={isSendingOtp}
+              >
+                Send Verification Code
+              </Button>
 
-            <button
-              type="button"
-              onClick={() => setIsResetOpen(false)}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-            >
-              Back to Sign In
-            </button>
-          </CardFooter>
-        </form>
+              <button
+                type="button"
+                onClick={() => {
+                  setIsResetOpen(false);
+                  setResetError(null);
+                  setResetSuccess(null);
+                }}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+              >
+                Back to Sign In
+              </button>
+            </CardFooter>
+          </form>
+        ) : (
+          <form onSubmit={handleResetPassword}>
+            <CardContent className="space-y-4 pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-bold text-foreground">Verify OTP Code</h2>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Enter the 6-digit code sent to <span className="font-semibold text-foreground">{resetEmail}</span>
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setOtpSent(false)}
+                  className="text-xs text-cyan-500 hover:underline"
+                >
+                  Change Email
+                </button>
+              </div>
+
+              {resetError && (
+                <Alert variant="destructive">
+                  <AlertDescription>{resetError}</AlertDescription>
+                </Alert>
+              )}
+
+              {resetSuccess && (
+                <div className="p-3 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-emerald-600 dark:text-emerald-400 text-xs font-medium">
+                  {resetSuccess}
+                </div>
+              )}
+
+              <div className="space-y-1.5">
+                <label htmlFor="reset-otp" className="text-xs font-medium text-foreground">
+                  6-Digit Verification Code
+                </label>
+                <Input
+                  id="reset-otp"
+                  type="text"
+                  maxLength={6}
+                  placeholder="123456"
+                  required
+                  className="tracking-widest font-mono text-center text-lg font-bold"
+                  value={otp}
+                  onChange={(e) => setOtp(e.target.value.replace(/\D/g, ''))}
+                  disabled={isResetting}
+                  autoFocus
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="reset-new-password" className="text-xs font-medium text-foreground">
+                  New Password (min 8 chars)
+                </label>
+                <Input
+                  id="reset-new-password"
+                  type="password"
+                  placeholder="••••••••"
+                  required
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  disabled={isResetting}
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <label htmlFor="reset-confirm-password" className="text-xs font-medium text-foreground">
+                  Confirm New Password
+                </label>
+                <Input
+                  id="reset-confirm-password"
+                  type="password"
+                  placeholder="••••••••"
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  disabled={isResetting}
+                />
+              </div>
+            </CardContent>
+
+            <CardFooter className="flex flex-col space-y-3 pt-2">
+              <Button
+                type="submit"
+                className="w-full font-semibold shadow-xs"
+                isLoading={isResetting}
+              >
+                Verify Code & Set Password
+              </Button>
+
+              <div className="flex justify-between w-full text-xs">
+                <button
+                  type="button"
+                  onClick={handleSendOtp}
+                  disabled={isSendingOtp}
+                  className="text-cyan-500 hover:underline disabled:opacity-50"
+                >
+                  {isSendingOtp ? 'Resending...' : 'Resend Code'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsResetOpen(false);
+                    setOtpSent(false);
+                    setResetError(null);
+                    setResetSuccess(null);
+                  }}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            </CardFooter>
+          </form>
+        )
       ) : (
         <form onSubmit={handleSubmit}>
           <CardContent className="space-y-4 pt-6">

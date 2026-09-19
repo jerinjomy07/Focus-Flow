@@ -16,7 +16,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useRouter } from 'expo-router';
-import { ArrowLeft, Lock, Mail, KeyRound, X } from 'lucide-react-native';
+import { ArrowLeft, Lock, Mail, KeyRound, X, ShieldCheck, RefreshCw } from 'lucide-react-native';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { authApi } from '../../api/auth';
@@ -39,8 +39,11 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
   // Forgot / Reset Password state
   const [isResetModalVisible, setIsResetModalVisible] = useState(false);
   const [resetEmail, setResetEmail] = useState('');
+  const [otp, setOtp] = useState('');
+  const [otpSent, setOtpSent] = useState(false);
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSendingOtp, setIsSendingOtp] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [resetError, setResetError] = useState<string | null>(null);
   const [resetSuccess, setResetSuccess] = useState<string | null>(null);
@@ -68,9 +71,37 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     }
   };
 
-  const handleResetPassword = async () => {
+  const handleSendOtp = async () => {
     if (!resetEmail.trim()) {
       setResetError('Please enter your account email address.');
+      return;
+    }
+
+    setIsSendingOtp(true);
+    setResetError(null);
+    setResetSuccess(null);
+
+    try {
+      const res = await authApi.sendPasswordResetOtp(resetEmail.trim());
+      setOtpSent(true);
+      setResetSuccess(res.message || 'Verification code sent to your email.');
+      if (res.devOtp) {
+        setOtp(res.devOtp);
+      }
+    } catch (err: unknown) {
+      if (err instanceof ApiClientError) {
+        setResetError(err.message);
+      } else {
+        setResetError('Failed to send verification code. Please check your connection.');
+      }
+    } finally {
+      setIsSendingOtp(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!otp.trim() || otp.trim().length !== 6) {
+      setResetError('Please enter the 6-digit verification code.');
       return;
     }
     if (!newPassword || newPassword.length < 8) {
@@ -89,6 +120,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
     try {
       await authApi.resetPassword({
         email: resetEmail.trim(),
+        otp: otp.trim(),
         newPassword,
       });
 
@@ -102,7 +134,7 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
       if (err instanceof ApiClientError) {
         setResetError(err.message);
       } else {
-        setResetError('Failed to reset password. Please check your credentials and network connection.');
+        setResetError('Failed to reset password. Please check your verification code.');
       }
     } finally {
       setIsResetting(false);
@@ -300,140 +332,241 @@ export const LoginScreen: React.FC<Props> = ({ navigation }) => {
                 </TouchableOpacity>
               </View>
 
-              <Text style={[typography.headlineSm, { color: colors.text, marginTop: 10 }]}>
-                Reset Password
-              </Text>
-              <Text style={[typography.bodySm, { color: colors.textSecondary, marginTop: 4, marginBottom: 12 }]}>
-                Enter your registered email address and choose a new password.
-              </Text>
+              {!otpSent ? (
+                <>
+                  <Text style={[typography.headlineSm, { color: colors.text, marginTop: 10 }]}>
+                    Reset Password
+                  </Text>
+                  <Text style={[typography.bodySm, { color: colors.textSecondary, marginTop: 4, marginBottom: 12 }]}>
+                    Enter your account email. We will send a secure 6-digit code to verify your identity.
+                  </Text>
 
-              {resetError && (
-                <View
-                  style={[
-                    styles.modalAlert,
-                    {
-                      backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(186, 26, 26, 0.12)',
-                      borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : 'rgba(186, 26, 26, 0.25)',
-                    },
-                  ]}
-                >
-                  <Text style={[typography.bodySm, { color: colors.error }]}>{resetError}</Text>
-                </View>
+                  {resetError && (
+                    <View
+                      style={[
+                        styles.modalAlert,
+                        {
+                          backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(186, 26, 26, 0.12)',
+                          borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : 'rgba(186, 26, 26, 0.25)',
+                        },
+                      ]}
+                    >
+                      <Text style={[typography.bodySm, { color: colors.error }]}>{resetError}</Text>
+                    </View>
+                  )}
+
+                  {resetSuccess && (
+                    <View
+                      style={[
+                        styles.modalAlert,
+                        {
+                          backgroundColor: isDark ? 'rgba(76, 215, 246, 0.15)' : 'rgba(45, 90, 67, 0.12)',
+                          borderColor: isDark ? 'rgba(76, 215, 246, 0.3)' : 'rgba(45, 90, 67, 0.25)',
+                        },
+                      ]}
+                    >
+                      <Text style={[typography.bodySm, { color: colors.secondary }]}>{resetSuccess}</Text>
+                    </View>
+                  )}
+
+                  <View style={styles.modalInputGroup}>
+                    <View style={styles.labelRow}>
+                      <Mail size={13} color={colors.textSecondary} />
+                      <Text style={[typography.labelCaps, { color: colors.textSecondary, fontSize: 10 }]}>
+                        ACCOUNT EMAIL
+                      </Text>
+                    </View>
+                    <TextInput
+                      style={[
+                        typography.body,
+                        styles.input,
+                        {
+                          backgroundColor: isDark ? 'rgba(8, 14, 26, 0.8)' : 'rgba(233, 228, 217, 0.8)',
+                          borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : colors.border,
+                          color: colors.text,
+                        },
+                      ]}
+                      placeholder="you@example.com"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="email-address"
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      value={resetEmail}
+                      onChangeText={(text) => {
+                        setResetEmail(text);
+                        if (resetError) setResetError(null);
+                      }}
+                      accessibilityLabel="Reset Email input"
+                    />
+                  </View>
+
+                  <View style={{ marginTop: 16 }}>
+                    <KineticButton
+                      title="SEND VERIFICATION CODE"
+                      variant="primary"
+                      onPress={handleSendOtp}
+                      loading={isSendingOtp}
+                    />
+                  </View>
+                </>
+              ) : (
+                <>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 10 }}>
+                    <Text style={[typography.headlineSm, { color: colors.text }]}>
+                      Verify OTP Code
+                    </Text>
+                    <TouchableOpacity onPress={() => setOtpSent(false)}>
+                      <Text style={[typography.labelCaps, { color: colors.secondary, fontSize: 10 }]}>
+                        CHANGE EMAIL
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Text style={[typography.bodySm, { color: colors.textSecondary, marginTop: 4, marginBottom: 12 }]}>
+                    Enter the 6-digit code sent to <Text style={{ color: colors.text, fontWeight: '700' }}>{resetEmail}</Text>
+                  </Text>
+
+                  {resetError && (
+                    <View
+                      style={[
+                        styles.modalAlert,
+                        {
+                          backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(186, 26, 26, 0.12)',
+                          borderColor: isDark ? 'rgba(239, 68, 68, 0.3)' : 'rgba(186, 26, 26, 0.25)',
+                        },
+                      ]}
+                    >
+                      <Text style={[typography.bodySm, { color: colors.error }]}>{resetError}</Text>
+                    </View>
+                  )}
+
+                  {resetSuccess && (
+                    <View
+                      style={[
+                        styles.modalAlert,
+                        {
+                          backgroundColor: isDark ? 'rgba(76, 215, 246, 0.15)' : 'rgba(45, 90, 67, 0.12)',
+                          borderColor: isDark ? 'rgba(76, 215, 246, 0.3)' : 'rgba(45, 90, 67, 0.25)',
+                        },
+                      ]}
+                    >
+                      <Text style={[typography.bodySm, { color: colors.secondary }]}>{resetSuccess}</Text>
+                    </View>
+                  )}
+
+                  <View style={styles.modalInputGroup}>
+                    <View style={styles.labelRow}>
+                      <ShieldCheck size={13} color={colors.secondary} />
+                      <Text style={[typography.labelCaps, { color: colors.secondary, fontSize: 10 }]}>
+                        6-DIGIT VERIFICATION CODE
+                      </Text>
+                    </View>
+                    <TextInput
+                      style={[
+                        typography.headlineSm,
+                        styles.input,
+                        {
+                          backgroundColor: isDark ? 'rgba(8, 14, 26, 0.8)' : 'rgba(233, 228, 217, 0.8)',
+                          borderColor: colors.secondary,
+                          color: colors.text,
+                          letterSpacing: 8,
+                          textAlign: 'center',
+                          fontWeight: '800',
+                        },
+                      ]}
+                      placeholder="123456"
+                      placeholderTextColor={colors.textMuted}
+                      keyboardType="number-pad"
+                      maxLength={6}
+                      value={otp}
+                      onChangeText={(text) => {
+                        setOtp(text.replace(/\D/g, ''));
+                        if (resetError) setResetError(null);
+                      }}
+                      accessibilityLabel="6-Digit OTP Code input"
+                      autoFocus
+                    />
+                  </View>
+
+                  <View style={styles.modalInputGroup}>
+                    <View style={styles.labelRow}>
+                      <KeyRound size={13} color={colors.textSecondary} />
+                      <Text style={[typography.labelCaps, { color: colors.textSecondary, fontSize: 10 }]}>
+                        NEW PASSWORD
+                      </Text>
+                    </View>
+                    <TextInput
+                      style={[
+                        typography.body,
+                        styles.input,
+                        {
+                          backgroundColor: isDark ? 'rgba(8, 14, 26, 0.8)' : 'rgba(233, 228, 217, 0.8)',
+                          borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : colors.border,
+                          color: colors.text,
+                        },
+                      ]}
+                      placeholder="Minimum 8 characters"
+                      placeholderTextColor={colors.textMuted}
+                      secureTextEntry
+                      autoCapitalize="none"
+                      value={newPassword}
+                      onChangeText={(text) => {
+                        setNewPassword(text);
+                        if (resetError) setResetError(null);
+                      }}
+                      accessibilityLabel="New Password input"
+                    />
+                  </View>
+
+                  <View style={styles.modalInputGroup}>
+                    <View style={styles.labelRow}>
+                      <Lock size={13} color={colors.textSecondary} />
+                      <Text style={[typography.labelCaps, { color: colors.textSecondary, fontSize: 10 }]}>
+                        CONFIRM NEW PASSWORD
+                      </Text>
+                    </View>
+                    <TextInput
+                      style={[
+                        typography.body,
+                        styles.input,
+                        {
+                          backgroundColor: isDark ? 'rgba(8, 14, 26, 0.8)' : 'rgba(233, 228, 217, 0.8)',
+                          borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : colors.border,
+                          color: colors.text,
+                        },
+                      ]}
+                      placeholder="Re-enter new password"
+                      placeholderTextColor={colors.textMuted}
+                      secureTextEntry
+                      autoCapitalize="none"
+                      value={confirmPassword}
+                      onChangeText={(text) => {
+                        setConfirmPassword(text);
+                        if (resetError) setResetError(null);
+                      }}
+                      accessibilityLabel="Confirm New Password input"
+                    />
+                  </View>
+
+                  <View style={{ marginTop: 16 }}>
+                    <KineticButton
+                      title="VERIFY & RESET PASSWORD"
+                      variant="primary"
+                      onPress={handleResetPassword}
+                      loading={isResetting}
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    style={{ marginTop: 12, alignItems: 'center', padding: 8 }}
+                    onPress={handleSendOtp}
+                    disabled={isSendingOtp}
+                  >
+                    <Text style={[typography.labelCaps, { color: colors.secondary, fontSize: 10 }]}>
+                      {isSendingOtp ? 'RESENDING CODE...' : 'RESEND VERIFICATION CODE'}
+                    </Text>
+                  </TouchableOpacity>
+                </>
               )}
-
-              {resetSuccess && (
-                <View
-                  style={[
-                    styles.modalAlert,
-                    {
-                      backgroundColor: isDark ? 'rgba(76, 215, 246, 0.15)' : 'rgba(45, 90, 67, 0.12)',
-                      borderColor: isDark ? 'rgba(76, 215, 246, 0.3)' : 'rgba(45, 90, 67, 0.25)',
-                    },
-                  ]}
-                >
-                  <Text style={[typography.bodySm, { color: colors.secondary }]}>{resetSuccess}</Text>
-                </View>
-              )}
-
-              <View style={styles.modalInputGroup}>
-                <View style={styles.labelRow}>
-                  <Mail size={13} color={colors.textSecondary} />
-                  <Text style={[typography.labelCaps, { color: colors.textSecondary, fontSize: 10 }]}>
-                    ACCOUNT EMAIL
-                  </Text>
-                </View>
-                <TextInput
-                  style={[
-                    typography.body,
-                    styles.input,
-                    {
-                      backgroundColor: isDark ? 'rgba(8, 14, 26, 0.8)' : 'rgba(233, 228, 217, 0.8)',
-                      borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : colors.border,
-                      color: colors.text,
-                    },
-                  ]}
-                  placeholder="you@example.com"
-                  placeholderTextColor={colors.textMuted}
-                  keyboardType="email-address"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  value={resetEmail}
-                  onChangeText={(text) => {
-                    setResetEmail(text);
-                    if (resetError) setResetError(null);
-                  }}
-                  accessibilityLabel="Reset Email input"
-                />
-              </View>
-
-              <View style={styles.modalInputGroup}>
-                <View style={styles.labelRow}>
-                  <KeyRound size={13} color={colors.textSecondary} />
-                  <Text style={[typography.labelCaps, { color: colors.textSecondary, fontSize: 10 }]}>
-                    NEW PASSWORD
-                  </Text>
-                </View>
-                <TextInput
-                  style={[
-                    typography.body,
-                    styles.input,
-                    {
-                      backgroundColor: isDark ? 'rgba(8, 14, 26, 0.8)' : 'rgba(233, 228, 217, 0.8)',
-                      borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : colors.border,
-                      color: colors.text,
-                    },
-                  ]}
-                  placeholder="Minimum 8 characters"
-                  placeholderTextColor={colors.textMuted}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  value={newPassword}
-                  onChangeText={(text) => {
-                    setNewPassword(text);
-                    if (resetError) setResetError(null);
-                  }}
-                  accessibilityLabel="New Password input"
-                />
-              </View>
-
-              <View style={styles.modalInputGroup}>
-                <View style={styles.labelRow}>
-                  <Lock size={13} color={colors.textSecondary} />
-                  <Text style={[typography.labelCaps, { color: colors.textSecondary, fontSize: 10 }]}>
-                    CONFIRM NEW PASSWORD
-                  </Text>
-                </View>
-                <TextInput
-                  style={[
-                    typography.body,
-                    styles.input,
-                    {
-                      backgroundColor: isDark ? 'rgba(8, 14, 26, 0.8)' : 'rgba(233, 228, 217, 0.8)',
-                      borderColor: isDark ? 'rgba(255, 255, 255, 0.08)' : colors.border,
-                      color: colors.text,
-                    },
-                  ]}
-                  placeholder="Re-enter new password"
-                  placeholderTextColor={colors.textMuted}
-                  secureTextEntry
-                  autoCapitalize="none"
-                  value={confirmPassword}
-                  onChangeText={(text) => {
-                    setConfirmPassword(text);
-                    if (resetError) setResetError(null);
-                  }}
-                  accessibilityLabel="Confirm New Password input"
-                />
-              </View>
-
-              <View style={{ marginTop: 16 }}>
-                <KineticButton
-                  title="RESET PASSWORD & SIGN IN"
-                  variant="primary"
-                  onPress={handleResetPassword}
-                  loading={isResetting}
-                />
-              </View>
             </GlassCard>
           </KeyboardAvoidingView>
         </View>

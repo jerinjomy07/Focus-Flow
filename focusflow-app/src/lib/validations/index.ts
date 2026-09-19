@@ -58,12 +58,25 @@ export const RegisterSchema = z.object({
 }).strict();
 export type RegisterInput = z.infer<typeof RegisterSchema>;
 
+export const SendPasswordResetOtpSchema = z.object({
+  email: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .email('Must be a valid email address'),
+}).strict();
+export type SendPasswordResetOtpInput = z.infer<typeof SendPasswordResetOtpSchema>;
+
 export const ResetPasswordSchema = z.object({
   email: z
     .string()
     .trim()
     .toLowerCase()
     .email('Must be a valid email address'),
+  otp: z
+    .string()
+    .trim()
+    .regex(/^\d{6}$/, 'Verification code must be a 6-digit numeric OTP'),
   newPassword: z
     .string()
     .min(8, 'Password must be at least 8 characters')

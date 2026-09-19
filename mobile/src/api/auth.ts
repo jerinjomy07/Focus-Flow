@@ -23,6 +23,12 @@ export interface RegisterResponse {
   user: User;
 }
 
+export interface SendResetOtpResponse {
+  success: boolean;
+  message: string;
+  devOtp?: string;
+}
+
 export interface ResetPasswordResponse {
   success: boolean;
   message: string;
@@ -33,7 +39,11 @@ export const authApi = {
     return api.post<LoginResponse>('/auth/mobile/login', credentials);
   },
 
-  resetPassword: async (payload: { email: string; newPassword: string }): Promise<ResetPasswordResponse> => {
+  sendPasswordResetOtp: async (email: string): Promise<SendResetOtpResponse> => {
+    return api.post<SendResetOtpResponse>('/auth/reset-password/send-otp', { email });
+  },
+
+  resetPassword: async (payload: { email: string; otp: string; newPassword: string }): Promise<ResetPasswordResponse> => {
     return api.post<ResetPasswordResponse>('/auth/reset-password', payload);
   },
 
